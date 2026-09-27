@@ -1,3 +1,4 @@
+from collections import OrderedDict
 import asyncio
 import logging
 from typing import Dict, Tuple, Optional
@@ -9,10 +10,18 @@ from app.core.database import get_async_db, AsyncSessionLocal
 logger = logging.getLogger("tiles")
 router = APIRouter(prefix="/tiles", tags=["Vector Tiles"])
 
-# Cache sederhana di memori untuk tile hasil build (in-memory tile cache)
-# Key: (z, x, y, v), Value: bytes
-_tile_cache: Dict[Tuple[int, int, int, Optional[str]], bytes] = {}
+# Cache LRU di memori untuk tile hasil build (Maksimal 1.000 entri untuk mencegah memory leak)
+_tile_cache: OrderedDict[Tuple[int, int, int, Optional[str], str], bytes] = OrderedDict()
+MAX_TILE_CACHE_SIZE = 1000
 _last_refresh: Optional[str] = None
+
+
+def put_tile_cache(key: Tuple[int, int, int, Optional[str], str], val: bytes):
+    if key in _tile_cache:
+        _tile_cache.move_to_end(key)
+    _tile_cache[key] = val
+    if len(_tile_cache) > MAX_TILE_CACHE_SIZE:
+        _tile_cache.popitem(last=False)
 
 
 async def refresh_mv_dampak_concurrently():
@@ -70,12 +79,12 @@ async def get_choropleth_tile(
 ):
     """
     Menyajikan Vector Tile (MVT) poligon kabupaten/kecamatan beserta data agregasi dampak bencana.
-    Memanfaatkan fungsi native PostGIS ST_TileEnvelope, ST_AsMVTGeom, dan ST_AsMVT.
-    Tampilan default makro menyajikan 19 Kabupaten/Kota di Sumatera Barat.
+    Mendukung agregasi hierarkis anak kecamatan untuk level kabupaten makro.
     """
     target_level = "kecamatan" if level and level.lower() == "kecamatan" else "kabupaten"
     cache_key = (z, x, y, v, target_level)
     if cache_key in _tile_cache:
+        _tile_cache.move_to_end(cache_key)
         return Response(
             content=_tile_cache[cache_key],
             media_type="application/x-protobuf",
@@ -90,19 +99,81 @@ async def get_choropleth_tile(
     geom_expr = "ST_Transform(ST_MakeValid(COALESCE(w.geom_simplified, w.geom)), 3857)" if z <= 10 else "ST_Transform(ST_MakeValid(w.geom), 3857)"
 
     sql = text(f"""
-        WITH mvtgeom AS (
+        WITH agg_dampak AS (
+            SELECT 
+                w.id AS wilayah_id,
+                COALESCE(
+                    CASE 
+                        WHEN :target_level = 'kabupaten' THEN (
+                            SELECT SUM(sub_mv.total_kerugian) 
+                            FROM mv_dampak_per_kecamatan sub_mv 
+                            JOIN wilayah_administratif sub_w ON sub_w.id = sub_mv.wilayah_id 
+                            WHERE sub_w.parent_id = w.id
+                        )
+                        ELSE mv.total_kerugian 
+                    END, 0
+                )::float AS total_kerugian,
+                COALESCE(
+                    CASE 
+                        WHEN :target_level = 'kabupaten' THEN (
+                            SELECT SUM(sub_mv.total_meninggal) 
+                            FROM mv_dampak_per_kecamatan sub_mv 
+                            JOIN wilayah_administratif sub_w ON sub_w.id = sub_mv.wilayah_id 
+                            WHERE sub_w.parent_id = w.id
+                        )
+                        ELSE mv.total_meninggal 
+                    END, 0
+                )::int AS total_meninggal,
+                COALESCE(
+                    CASE 
+                        WHEN :target_level = 'kabupaten' THEN (
+                            SELECT SUM(sub_mv.total_luka) 
+                            FROM mv_dampak_per_kecamatan sub_mv 
+                            JOIN wilayah_administratif sub_w ON sub_w.id = sub_mv.wilayah_id 
+                            WHERE sub_w.parent_id = w.id
+                        )
+                        ELSE mv.total_luka 
+                    END, 0
+                )::int AS total_luka,
+                COALESCE(
+                    CASE 
+                        WHEN :target_level = 'kabupaten' THEN (
+                            SELECT SUM(sub_mv.total_terdampak) 
+                            FROM mv_dampak_per_kecamatan sub_mv 
+                            JOIN wilayah_administratif sub_w ON sub_w.id = sub_mv.wilayah_id 
+                            WHERE sub_w.parent_id = w.id
+                        )
+                        ELSE mv.total_terdampak 
+                    END, 0
+                )::int AS total_terdampak,
+                COALESCE(
+                    CASE 
+                        WHEN :target_level = 'kabupaten' THEN (
+                            SELECT SUM(sub_mv.jumlah_kejadian) 
+                            FROM mv_dampak_per_kecamatan sub_mv 
+                            JOIN wilayah_administratif sub_w ON sub_w.id = sub_mv.wilayah_id 
+                            WHERE sub_w.parent_id = w.id
+                        )
+                        ELSE mv.jumlah_kejadian 
+                    END, 0
+                )::int AS jumlah_kejadian
+            FROM wilayah_administratif w
+            LEFT JOIN mv_dampak_per_kecamatan mv ON mv.wilayah_id = w.id
+            WHERE w.level = :target_level
+        ),
+        mvtgeom AS (
             SELECT 
                 w.id,
                 w.nama,
                 w.kode_wilayah,
-                COALESCE(mv.total_kerugian, 0)::float AS total_kerugian,
-                COALESCE(mv.total_meninggal, 0)::int AS total_meninggal,
-                COALESCE(mv.total_luka, 0)::int AS total_luka,
-                COALESCE(mv.total_terdampak, 0)::int AS total_terdampak,
-                COALESCE(mv.jumlah_kejadian, 0)::int AS jumlah_kejadian,
+                ad.total_kerugian,
+                ad.total_meninggal,
+                ad.total_luka,
+                ad.total_terdampak,
+                ad.jumlah_kejadian,
                 CASE 
-                    WHEN COALESCE(mv.total_kerugian, 0) >= 1500000000 OR COALESCE(mv.total_meninggal, 0) > 0 THEN 'tinggi'
-                    WHEN COALESCE(mv.total_kerugian, 0) >= 400000000 THEN 'sedang'
+                    WHEN ad.total_kerugian >= 1500000000 OR ad.total_meninggal > 0 THEN 'tinggi'
+                    WHEN ad.total_kerugian >= 400000000 THEN 'sedang'
                     ELSE 'rendah'
                 END AS tingkat_risiko,
                 ST_AsMVTGeom(
@@ -113,35 +184,46 @@ async def get_choropleth_tile(
                     true
                 ) AS geom
             FROM wilayah_administratif w
-            LEFT JOIN mv_dampak_per_kecamatan mv ON mv.wilayah_id = w.id
+            JOIN agg_dampak ad ON ad.wilayah_id = w.id
             WHERE w.level = :target_level
               AND w.geom IS NOT NULL
               AND ST_Intersects(
-                  {geom_expr},
-                  ST_TileEnvelope(:z, :x, :y)
+                  w.geom,
+                  ST_Transform(ST_TileEnvelope(:z, :x, :y), 4326)
               )
         )
         SELECT ST_AsMVT(mvtgeom.*, 'choropleth_kecamatan') AS mvt FROM mvtgeom;
     """)
 
-    result = await db.execute(sql, {"z": z, "x": x, "y": y, "target_level": target_level})
-    tile_data = result.scalar()
+    try:
+        result = await db.execute(sql, {"z": z, "x": x, "y": y, "target_level": target_level})
+        mvt = result.scalar()
 
-    tile_bytes = bytes(tile_data) if tile_data else b""
-    
-    # Simpan di cache memori jika zoom level <= 12
-    if z <= 12 and len(_tile_bytes := tile_bytes) > 0:
-        _tile_cache[cache_key] = _tile_bytes
+        if not mvt:
+            return Response(
+                content=b"",
+                status_code=status.HTTP_204_NO_CONTENT,
+                headers={"Cache-Control": "public, max-age=300"}
+            )
 
-    return Response(
-        content=tile_bytes,
-        media_type="application/x-protobuf",
-        headers={
-            "Content-Type": "application/x-protobuf",
-            "Cache-Control": "public, max-age=900, stale-while-revalidate=3600",
-            "X-Tile-Cache": "MISS"
-        }
-    )
+        tile_bytes = bytes(mvt)
+        put_tile_cache(cache_key, tile_bytes)
+        return Response(
+            content=tile_bytes,
+            media_type="application/x-protobuf",
+            headers={
+                "Content-Type": "application/x-protobuf",
+                "Cache-Control": "public, max-age=900, stale-while-revalidate=3600",
+                "X-Tile-Cache": "MISS"
+            }
+        )
+    except Exception as e:
+        logger.warning(f"Gagal generate MVT tile {z}/{x}/{y}: {e}")
+        return Response(
+            content=b"",
+            status_code=status.HTTP_204_NO_CONTENT,
+            headers={"Cache-Control": "public, max-age=60"}
+        )
 
 
 @router.post("/refresh-materialized-view")

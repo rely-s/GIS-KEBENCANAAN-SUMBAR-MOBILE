@@ -19,7 +19,7 @@ class Pengguna(Base):
 
     __table_args__ = (
         CheckConstraint(
-            "role IN ('operator', 'admin', 'pimpinan')",
+            "role IN ('operator', 'pusdalops', 'admin', 'pimpinan', 'super_admin')",
             name="check_pengguna_role"
         ),
     )

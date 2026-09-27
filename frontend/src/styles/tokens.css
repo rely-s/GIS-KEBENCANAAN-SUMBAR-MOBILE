@@ -128,3 +128,74 @@ body {
 ::-webkit-scrollbar-thumb:hover {
   background: #3B536D;
 }
+
+/* ==========================================================================
+   ANIMASI TSUNAMI & EPISENTRUM GEMPA (Gelombang Berdenyut 3 Lapis)
+   ========================================================================== */
+@keyframes tsunami-pulse-1 {
+  0% { transform: scale(0.6); opacity: 0.9; }
+  50% { opacity: 0.5; }
+  100% { transform: scale(2.2); opacity: 0; }
+}
+
+@keyframes tsunami-pulse-2 {
+  0% { transform: scale(0.6); opacity: 0.8; }
+  60% { opacity: 0.4; }
+  100% { transform: scale(3.4); opacity: 0; }
+}
+
+@keyframes tsunami-pulse-3 {
+  0% { transform: scale(0.6); opacity: 0.7; }
+  70% { opacity: 0.3; }
+  100% { transform: scale(4.8); opacity: 0; }
+}
+
+@keyframes neon-glow-danger {
+  0%, 100% {
+    box-shadow: 0 0 15px rgba(239, 68, 68, 0.9), 0 0 30px rgba(220, 38, 38, 0.6);
+  }
+  50% {
+    box-shadow: 0 0 25px rgba(239, 68, 68, 1), 0 0 50px rgba(239, 68, 68, 0.8), 0 0 70px rgba(220, 38, 38, 0.5);
+  }
+}
+
+.animate-tsunami-ring-1 {
+  animation: tsunami-pulse-1 2.4s cubic-bezier(0.1, 0.7, 0.3, 1) infinite;
+}
+
+.animate-tsunami-ring-2 {
+  animation: tsunami-pulse-2 2.4s cubic-bezier(0.1, 0.7, 0.3, 1) 0.8s infinite;
+}
+
+.animate-tsunami-ring-3 {
+  animation: tsunami-pulse-3 2.4s cubic-bezier(0.1, 0.7, 0.3, 1) 1.6s infinite;
+}
+
+.marker-tsunami-epicenter {
+  animation: neon-glow-danger 1.8s ease-in-out infinite;
+}
+
+/* ==========================================================================
+   STANDARISASI AKSESIBILITAS WCAG 2.1 AA & ERGONOMI SISTEM KOMANDO
+   ========================================================================== */
+:root {
+  --touch-target-min: 44px;
+  --font-fluid-base: clamp(0.875rem, 0.8rem + 0.3vw, 1.125rem);
+}
+
+/* Keterbacaan dan Target Sentuh Ergonomis */
+button,
+a,
+input,
+select {
+  min-height: var(--touch-target-min);
+}
+
+/* Focus Visible untuk Aksesibilitas Keyboard */
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible {
+  outline: 2px solid #38BDF8;
+  outline-offset: 2px;
+}

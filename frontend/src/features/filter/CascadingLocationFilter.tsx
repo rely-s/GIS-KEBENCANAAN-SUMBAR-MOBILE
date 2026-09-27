@@ -61,46 +61,6 @@ export const CascadingLocationFilter: React.FC<CascadingLocationFilterProps> = (
   const [hasNoKecamatan, setHasNoKecamatan] = useState<boolean>(false);
 
   // ==========================================================================
-  // FETCH TINGKAT 1: KOTA / KABUPATEN DI SUMATERA BARAT (Otomatis saat Load)
-  // ==========================================================================
-  const fetchKotaSumbar = useCallback(async () => {
-    setLoadingKota(true);
-    setErrorKota(null);
-    try {
-      // Panggil endpoint /api/kota?id_provinsi=13
-      const res = await fetch('/api/kota?id_provinsi=13');
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = await res.json();
-      const items: ComboboxOption[] = Array.isArray(data)
-        ? data.map((k: any) => ({
-            id: String(k.id),
-            nama: k.nama,
-            extra: k.nama.startsWith('Kota') ? 'Kota Otonom' : 'Kabupaten'
-          }))
-        : [];
-      setKotaList(items);
-
-      // Inisialisasi awal jika ada props
-      if (initialKotaId && items.length > 0) {
-        const found = items.find((k) => k.id === initialKotaId);
-        if (found) {
-          setSelectedKota(found);
-          fetchKecamatanByKota(found.id);
-        }
-      }
-    } catch (err: any) {
-      console.error('Gagal mengambil data kota Sumbar:', err);
-      setErrorKota('Gagal memuat daftar Kota/Kabupaten. Periksa koneksi API.');
-    } finally {
-      setLoadingKota(false);
-    }
-  }, [initialKotaId]);
-
-  useEffect(() => {
-    fetchKotaSumbar();
-  }, [fetchKotaSumbar]);
-
-  // ==========================================================================
   // FETCH TINGKAT 2: KECAMATAN BERDASARKAN KOTA TERPILIH
   // ==========================================================================
   const fetchKecamatanByKota = useCallback(async (idKota: string) => {
@@ -140,6 +100,47 @@ export const CascadingLocationFilter: React.FC<CascadingLocationFilterProps> = (
       setLoadingKecamatan(false);
     }
   }, [initialKecamatanId]);
+
+  // ==========================================================================
+  // FETCH TINGKAT 1: KOTA / KABUPATEN DI SUMATERA BARAT (Otomatis saat Load)
+  // ==========================================================================
+  const fetchKotaSumbar = useCallback(async () => {
+    setLoadingKota(true);
+    setErrorKota(null);
+    try {
+      // Panggil endpoint /api/kota?id_provinsi=13
+      const res = await fetch('/api/kota?id_provinsi=13');
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      const items: ComboboxOption[] = Array.isArray(data)
+        ? data.map((k: any) => ({
+            id: String(k.id),
+            nama: k.nama,
+            extra: k.nama.startsWith('Kota') ? 'Kota Otonom' : 'Kabupaten'
+          }))
+        : [];
+      setKotaList(items);
+
+      // Inisialisasi awal jika ada props
+      if (initialKotaId && items.length > 0) {
+        const found = items.find((k) => k.id === initialKotaId);
+        if (found) {
+          setSelectedKota(found);
+          fetchKecamatanByKota(found.id);
+        }
+      }
+    } catch (err: any) {
+      console.error('Gagal mengambil data kota Sumbar:', err);
+      setErrorKota('Gagal memuat daftar Kota/Kabupaten. Periksa koneksi API.');
+    } finally {
+      setLoadingKota(false);
+    }
+  }, [initialKotaId, fetchKecamatanByKota]);
+
+  useEffect(() => {
+    fetchKotaSumbar();
+  }, [fetchKotaSumbar]);
+
 
   // ==========================================================================
   // HANDLERS PERUBAHAN CASCADING

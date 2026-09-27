@@ -73,8 +73,14 @@ async def get_peringatan_cuaca(db: AsyncSession = Depends(get_async_db)):
             id, identifier, event, headline, description, severity,
             urgency, certainty, effective, expires, area_desc, created_at
         FROM peringatan_cuaca_bmkg
-        ORDER BY id DESC
-        LIMIT 5;
+        ORDER BY 
+            CASE severity 
+                WHEN 'Severe' THEN 1 
+                WHEN 'Moderate' THEN 2 
+                ELSE 3 
+            END ASC,
+            id DESC
+        LIMIT 10;
     """)
     result = await db.execute(query)
     rows = result.fetchall()

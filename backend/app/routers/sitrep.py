@@ -1,20 +1,29 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import text
 from datetime import datetime, timezone
+from typing import Optional
 
 from app.core.database import get_async_db
+from app.core.dependencies import require_role
+from app.models.pengguna import Pengguna
 
 router = APIRouter(prefix="/admin/sitrep", tags=["Laporan Situasi (SITREP) BNPB/BPBD"])
 
 @router.get("")
-async def get_situation_report(db: AsyncSession = Depends(get_async_db)):
+async def get_situation_report(
+    bencana_id: Optional[int] = Query(None, description="Filter spesifik ID kejadian bencana darurat"),
+    current_user: Pengguna = Depends(require_role(["pimpinan", "admin", "operator"])),
+    db: AsyncSession = Depends(get_async_db)
+):
     """
-    Menghasilkan Dokumen Laporan Situasi (SITREP) Resmi Berstandar BNPB
-    berdasarkan data riil terkini di basis data PostGIS (CKAN BPBD, BMKG, dan Operator Lapangan).
+    Khusus Petugas & Pimpinan: Menghasilkan Dokumen Laporan Situasi (SITREP) Resmi Berstandar BNPB.
+    Mendukung filter kejadian darurat aktif spesifik agar tidak mencampuradukkan data historis tahun lampau.
     """
-    # 1. Agregasi Dampak Keseluruhan
-    dampak_q = text("""
+    # 1. Agregasi Dampak (dengan filter bencana_id jika disediakan)
+    dampak_where = "WHERE kejadian_id = :bencana_id" if bencana_id else ""
+    dampak_params = {"bencana_id": bencana_id} if bencana_id else {}
+    dampak_q = text(f"""
         SELECT 
             COALESCE(SUM(korban_meninggal), 0) AS meninggal,
             COALESCE(SUM(korban_hilang), 0) AS hilang,
@@ -22,9 +31,10 @@ async def get_situation_report(db: AsyncSession = Depends(get_async_db)):
             COALESCE(SUM(jumlah_pengungsi), 0) AS pengungsi,
             COALESCE(SUM(penduduk_terdampak), 0) AS terdampak,
             COALESCE(SUM(kerugian_rp), 0) AS kerugian_rp
-        FROM data_dampak_bencana;
+        FROM data_dampak_bencana
+        {dampak_where};
     """)
-    dampak_res = (await db.execute(dampak_q)).fetchone()
+    dampak_res = (await db.execute(dampak_q, dampak_params)).fetchone()
 
     total_meninggal = int(dampak_res.meninggal) if dampak_res else 0
     total_hilang = int(dampak_res.hilang) if dampak_res else 0

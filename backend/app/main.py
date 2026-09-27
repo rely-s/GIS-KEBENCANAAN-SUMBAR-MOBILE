@@ -5,13 +5,17 @@ from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
+from fastapi.staticfiles import StaticFiles
+from pathlib import Path
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
+from slowapi.middleware import SlowAPIMiddleware
 
 from app.core.config import settings
-from app.routers import health, wilayah, auth, routing, posko, jalan, eksternal, admin, bencana, tiles, sitrep, cascading_wilayah, chatbot
+from app.routers import health, wilayah, auth, routing, posko, jalan, eksternal, admin, bencana, tiles, sitrep, cascading_wilayah, chatbot, proximity, inarisk_proxy, events
 from app.services.bmkg_service import start_bmkg_scheduler, sync_gempa_bmkg
+from app.services.bmkg_weather_service import sync_bmkg_weather_alerts
 from app.routers.tiles import start_tiles_scheduler
 
 logger = logging.getLogger("main")
@@ -22,9 +26,10 @@ limiter = Limiter(key_func=get_remote_address, default_limits=["240/minute"])
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup:
-    # 1. Jalankan scheduler background BMKG (sensor gempa)
+    # 1. Jalankan scheduler background BMKG (sensor gempa & cuaca aktif)
     start_bmkg_scheduler()
     asyncio.create_task(sync_gempa_bmkg())
+    asyncio.create_task(sync_bmkg_weather_alerts())
     
     # 2. Jalankan background worker tile & refresh materialized view CONCURRENTLY
     asyncio.create_task(start_tiles_scheduler(interval_seconds=900))
@@ -42,6 +47,7 @@ app = FastAPI(
 )
 
 app.state.limiter = limiter
+app.add_middleware(SlowAPIMiddleware)
 
 # Middleware Keamanan Header HTTP Tambahan (Defense-in-Depth)
 @app.middleware("http")
@@ -119,8 +125,18 @@ app.include_router(bencana.router, prefix="/api")
 app.include_router(tiles.router, prefix="/api")
 app.include_router(sitrep.router, prefix="/api")
 app.include_router(chatbot.router, prefix="/api")
-app.include_router(cascading_wilayah.router)
+app.include_router(proximity.router, prefix="/api")
+app.include_router(inarisk_proxy.router, prefix="/api")
+app.include_router(events.router, prefix="/api")
+# Router Cascading Wilayah Relasional (Provinsi -> Kota -> Kecamatan)
+# Disediakan pada prefix '/api' (standar RESTful) dan root '/' (kompatibilitas Vite dev proxy)
 app.include_router(cascading_wilayah.router, prefix="/api")
+app.include_router(cascading_wilayah.router, include_in_schema=False)
+
+# Mount Direktori Penyimpanan Statis (Foto Laporan Warga & Dokumen PDF SITREP)
+UPLOAD_DIR = Path(__file__).resolve().parent.parent / "uploads"
+UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+app.mount("/uploads", StaticFiles(directory=str(UPLOAD_DIR)), name="uploads")
 
 
 @app.get("/", include_in_schema=False)

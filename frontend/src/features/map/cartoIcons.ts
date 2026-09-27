@@ -82,72 +82,14 @@ export const SVG_SHELTER_TES = `
 </svg>
 `;
 
-// 4. Sirine EWS Tsunami BPBD - Siaga Aktif (ISO 22324 / BMKG)
-export const SVG_SIRINE_AKTIF = `
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
-  <defs>
-    <filter id="shadow-sirine" x="-20%" y="-20%" width="140%" height="140%">
-      <feDropShadow dx="0" dy="2.5" stdDeviation="2.5" flood-color="#000000" flood-opacity="0.4"/>
-    </filter>
-  </defs>
-  <!-- Squircle Base Pin (Kuning Amber Peringatan Dini) -->
-  <rect x="4" y="4" width="56" height="56" rx="14" fill="#D97706" stroke="#FFFFFF" stroke-width="3" filter="url(#shadow-sirine)"/>
-  
-  <!-- Menara Kisi Baja Sirine (Lattice Tower) -->
-  <line x1="26" y1="48" x2="30" y2="28" stroke="#FFFFFF" stroke-width="2.8" stroke-linecap="round"/>
-  <line x1="38" y1="48" x2="34" y2="28" stroke="#FFFFFF" stroke-width="2.8" stroke-linecap="round"/>
-  <line x1="28" y1="36" x2="36" y2="36" stroke="#FFFFFF" stroke-width="2"/>
-  <line x1="27" y1="44" x2="37" y2="44" stroke="#FFFFFF" stroke-width="2"/>
-  
-  <!-- Kepala Pemancar & Speaker Corong Sirine 4 Arah -->
-  <rect x="29.5" y="21" width="5" height="8" rx="1.5" fill="#FFFFFF"/>
-  <!-- Corong Kiri -->
-  <path d="M 29.5 22.5 L 20 18.5 L 20 29.5 L 29.5 25.5 Z" fill="#FFFFFF"/>
-  <!-- Corong Kanan -->
-  <path d="M 34.5 22.5 L 44 18.5 L 44 29.5 L 34.5 25.5 Z" fill="#FFFFFF"/>
-  
-  <!-- Gelombang Suara Akustik (Acoustic Shockwaves) -->
-  <path d="M 16 19 C 13.5 21.5 13.5 26.5 16 29" fill="none" stroke="#FEF08A" stroke-width="2.4" stroke-linecap="round"/>
-  <path d="M 48 19 C 50.5 21.5 50.5 26.5 48 29" fill="none" stroke="#FEF08A" stroke-width="2.4" stroke-linecap="round"/>
-</svg>
-`;
-
-// 5. Sirine EWS Tsunami BPBD - Dalam Pemeliharaan (Muted Slate)
-export const SVG_SIRINE_MAINT = `
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
-  <defs>
-    <filter id="shadow-maint" x="-20%" y="-20%" width="140%" height="140%">
-      <feDropShadow dx="0" dy="2.5" stdDeviation="2.5" flood-color="#000000" flood-opacity="0.4"/>
-    </filter>
-  </defs>
-  <!-- Squircle Base Pin (Slate Muted) -->
-  <rect x="4" y="4" width="56" height="56" rx="14" fill="#475569" stroke="#94A3B8" stroke-width="3" filter="url(#shadow-maint)"/>
-  
-  <!-- Menara Sirine Abu-Abu -->
-  <line x1="26" y1="48" x2="30" y2="28" stroke="#E2E8F0" stroke-width="2.8" stroke-linecap="round"/>
-  <line x1="38" y1="48" x2="34" y2="28" stroke="#E2E8F0" stroke-width="2.8" stroke-linecap="round"/>
-  <line x1="28" y1="36" x2="36" y2="36" stroke="#E2E8F0" stroke-width="2"/>
-  <rect x="29.5" y="21" width="5" height="8" rx="1.5" fill="#E2E8F0"/>
-  <path d="M 29.5 22.5 L 20 18.5 L 20 29.5 L 29.5 25.5 Z" fill="#E2E8F0"/>
-  <path d="M 34.5 22.5 L 44 18.5 L 44 29.5 L 34.5 25.5 Z" fill="#E2E8F0"/>
-  
-  <!-- Badge Kunci Pas Inspeksi / Pemeliharaan Teknis -->
-  <circle cx="45" cy="45" r="7.5" fill="#0F172A" stroke="#CBD5E1" stroke-width="2"/>
-  <path d="M 42 48 L 48 42" stroke="#FDE047" stroke-width="2.4" stroke-linecap="round"/>
-  <circle cx="47" cy="43" r="1.5" fill="#0F172A"/>
-</svg>
-`;
-
 /**
- * Daftarkan seluruh 5 ikon kartografis resmi ke MapLibre GL instance
+ * Daftarkan seluruh ikon kartografis resmi ke MapLibre GL instance
  */
 export async function registerCartoIcons(map: Map): Promise<void> {
   const icons: { id: string; svg: string }[] = [
     { id: 'carto-posko-pengungsi', svg: SVG_POSKO_PENGUNGSI },
     { id: 'carto-faskes-pengungsi', svg: SVG_FASKES_PENGUNGSI },
     { id: 'carto-shelter-tes', svg: SVG_SHELTER_TES },
-    { id: 'carto-sirine-aktif', svg: SVG_SIRINE_AKTIF },
-    { id: 'carto-sirine-maint', svg: SVG_SIRINE_MAINT },
   ];
 
   await Promise.all(

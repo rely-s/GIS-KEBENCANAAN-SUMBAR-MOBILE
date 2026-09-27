@@ -17,7 +17,7 @@ async def test_auth_login(client: httpx.AsyncClient):
     assert res_adm.status_code == 200
     assert "access_token" in res_adm.json()
 
-async def test_crud_posko(client: httpx.AsyncClient, operator_headers: dict):
+async def test_crud_posko(client: httpx.AsyncClient, operator_headers: dict, admin_headers: dict):
     """Test full lifecycle of Posko Evakuasi: create, detail, update, delete."""
     payload = {
         "nama": "Posko Uji Coba Pytest Automation",
@@ -45,8 +45,8 @@ async def test_crud_posko(client: httpx.AsyncClient, operator_headers: dict):
         assert update_res.status_code == 200
         assert update_res.json()["kapasitas"] == 650
     finally:
-        # Cleanup
-        del_res = await client.delete(f"/api/posko/{posko_id}", headers=operator_headers)
+        # Cleanup (Role admin diizinkan menghapus)
+        del_res = await client.delete(f"/api/posko/{posko_id}", headers=admin_headers)
         assert del_res.status_code in [200, 204]
 
 async def test_sirine_monitoring_status(client: httpx.AsyncClient):

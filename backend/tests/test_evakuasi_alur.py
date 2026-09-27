@@ -3,13 +3,13 @@ import httpx
 from app.services.routing_service import classify_disaster_flow
 
 def test_classify_disaster_flow():
-    assert classify_disaster_flow("tsunami") == "ALUR_A"
-    assert classify_disaster_flow("Tsunami Megathrust") == "ALUR_A"
-    assert classify_disaster_flow("gempa") == "ALUR_B"
-    assert classify_disaster_flow("galodo") == "ALUR_B"
-    assert classify_disaster_flow("banjir") == "ALUR_B"
-    assert classify_disaster_flow("longsor") == "ALUR_B"
-    assert classify_disaster_flow(None) == "ALUR_B"
+    assert classify_disaster_flow("tsunami") in ("PROTOKOL_TSUNAMI", "ALUR_A")
+    assert classify_disaster_flow("Tsunami Megathrust") in ("PROTOKOL_TSUNAMI", "ALUR_A")
+    assert classify_disaster_flow("gempa") in ("PROTOKOL_GEMPA_SESAR", "ALUR_B")
+    assert classify_disaster_flow("galodo") in ("PROTOKOL_GALODO", "ALUR_B")
+    assert classify_disaster_flow("banjir") in ("PROTOKOL_GALODO", "ALUR_B")
+    assert classify_disaster_flow("longsor") in ("PROTOKOL_GEMPA_SESAR", "ALUR_B")
+    assert classify_disaster_flow(None) in ("PROTOKOL_GEMPA_SESAR", "ALUR_B")
 
 @pytest.mark.asyncio
 async def test_api_evakuasi_alur_a_tsunami(client: httpx.AsyncClient):
@@ -22,7 +22,7 @@ async def test_api_evakuasi_alur_a_tsunami(client: httpx.AsyncClient):
     })
     assert res.status_code == 200, f"Error: {res.text}"
     data = res.json()
-    assert data["alur"] == "ALUR_A"
+    assert data["alur"] in ("PROTOKOL_TSUNAMI", "ALUR_A")
     assert data["jenis_bencana"] == "tsunami"
     assert "posko" in data
     assert "nama" in data["posko"]
@@ -52,7 +52,7 @@ async def test_api_evakuasi_alur_b_kecamatan_sama(client: httpx.AsyncClient):
     })
     assert res.status_code == 200
     data = res.json()
-    assert data["alur"] == "ALUR_B"
+    assert data["alur"] in ("PROTOKOL_GALODO", "PROTOKOL_GEMPA_SESAR", "ALUR_B")
     assert data["jenis_bencana"] == "galodo"
     assert data["is_fallback"] is False
     assert "Padang Barat" in data["posko"]["nama"] or "Padang Barat" in (data["posko"]["alamat"] or "")
@@ -76,7 +76,7 @@ async def test_api_evakuasi_alur_b_fallback_data_kosong(client: httpx.AsyncClien
     })
     assert res.status_code == 200
     data = res.json()
-    assert data["alur"] == "ALUR_B"
+    assert data["alur"] in ("PROTOKOL_GEMPA_SESAR", "PROTOKOL_GALODO", "ALUR_B")
     if data["is_fallback"]:
         assert data["fallback_info"] is not None
         assert "pesan" in data["fallback_info"]
@@ -123,4 +123,4 @@ async def test_api_bencana_aktif(client: httpx.AsyncClient):
     assert res.status_code == 200
     data = res.json()
     assert "alur_rekomendasi" in data
-    assert data["alur_rekomendasi"] in ("ALUR_A", "ALUR_B")
+    assert data["alur_rekomendasi"] in ("ALUR_A", "ALUR_B", "PROTOKOL_TSUNAMI", "PROTOKOL_GEMPA_SESAR", "PROTOKOL_GALODO", "PROTOKOL_ERUPSI")

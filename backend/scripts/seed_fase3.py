@@ -21,8 +21,16 @@ def seed_fase3():
     with sync_engine.connect() as conn:
         print("[-] Memulai seeding data Posko Evakuasi & Pengguna RBAC Fase 3...")
 
-        # 1. Seeding Akun Pengguna (RBAC: Admin, Operator, Pimpinan)
+        # 1. Seeding Akun Pengguna (RBAC: Super Admin, Admin, Operator, Pimpinan)
         users = [
+            {
+                "nama": "Super Administrator Sistem GIS BPBD",
+                "email": "superadmin@sumbarprov.go.id",
+                "password": hash_password("SuperAdminSumbar2026!"),
+                "role": "super_admin",
+                "wilayah_tugas_id": 1, # Provinsi Sumatera Barat
+                "aktif": True
+            },
             {
                 "nama": "Administrator Pusdalops BPBD Sumbar",
                 "email": "admin@sumbarprov.go.id",

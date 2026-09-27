@@ -9,7 +9,7 @@ import {
   ShieldAlert, 
   DollarSign, 
   Building2, 
-  Volume2, 
+  ShieldCheck, 
   RefreshCw, 
   X 
 } from 'lucide-react';
@@ -57,13 +57,31 @@ interface SitrepModalProps {
 export const SitrepModal: React.FC<SitrepModalProps> = ({ isOpen, onClose }) => {
   const [data, setData] = useState<SitrepData | null>(null);
   const [loading, setLoading] = useState(false);
-  const [copied, setCopied] = useState(false);
   const [activeTab, setActiveTab] = useState<'kpi' | 'raw_text'>('kpi');
+  const [copied, setCopied] = useState(false);
+  const [authError, setAuthError] = useState(false);
+  const [selectedBencanaId, setSelectedBencanaId] = useState<string>('');
+  const [daftarBencana, setDaftarBencana] = useState<Array<{ id: number; jenis_bencana: string; deskripsi: string; wilayah: string }>>([]);
 
-  const fetchSitrep = () => {
+  const fetchSitrep = (bencanaId?: string) => {
     setLoading(true);
-    fetch('/api/admin/sitrep')
-      .then((res) => (res.ok ? res.json() : null))
+    setAuthError(false);
+    const targetId = bencanaId !== undefined ? bencanaId : selectedBencanaId;
+    const query = targetId ? `?bencana_id=${targetId}` : '';
+    const token = typeof window !== 'undefined' ? localStorage.getItem('gis_auth_token') : null;
+    fetch(`/api/admin/sitrep${query}`, {
+      credentials: 'include',
+      headers: {
+        ...(token ? { Authorization: `Bearer ${token}` } : {})
+      }
+    })
+      .then((res) => {
+        if (res.status === 401 || res.status === 403) {
+          setAuthError(true);
+          return null;
+        }
+        return res.ok ? res.json() : null;
+      })
       .then((resData) => {
         if (resData) setData(resData);
       })
@@ -74,6 +92,15 @@ export const SitrepModal: React.FC<SitrepModalProps> = ({ isOpen, onClose }) => 
   useEffect(() => {
     if (isOpen) {
       fetchSitrep();
+      // Muat daftar bencana aktif untuk filter spesifik
+      fetch('/api/bencana?limit=20')
+        .then((res) => (res.ok ? res.json() : null))
+        .then((resJson) => {
+          if (resJson?.data) {
+            setDaftarBencana(resJson.data);
+          }
+        })
+        .catch((err) => console.debug('Gagal memuat filter bencana:', err));
     }
   }, [isOpen]);
 
@@ -95,10 +122,22 @@ export const SitrepModal: React.FC<SitrepModalProps> = ({ isOpen, onClose }) => 
     URL.revokeObjectURL(url);
   };
 
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
+
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/75 backdrop-blur-md animate-in fade-in duration-200">
+    <div 
+      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/75 backdrop-blur-md animate-in fade-in duration-200"
+      onClick={onClose}
+    >
       <div 
         className="relative w-full max-w-3xl max-h-[90vh] bg-[#0F1720] border border-[#243444] rounded-2xl shadow-2xl flex flex-col overflow-hidden text-slate-100 font-sans"
         onClick={(e) => e.stopPropagation()}
@@ -126,7 +165,7 @@ export const SitrepModal: React.FC<SitrepModalProps> = ({ isOpen, onClose }) => 
 
           <div className="flex items-center gap-2">
             <button
-              onClick={fetchSitrep}
+              onClick={() => fetchSitrep()}
               disabled={loading}
               className="p-2 rounded-lg bg-[#0F1720] border border-[#243444] text-slate-400 hover:text-white hover:bg-[#1B2733] transition-colors"
               title="Perbarui Data Terkini"
@@ -142,33 +181,65 @@ export const SitrepModal: React.FC<SitrepModalProps> = ({ isOpen, onClose }) => 
           </div>
         </div>
 
-        {/* Tab Navigasi */}
-        <div className="flex items-center gap-2 px-5 pt-3 border-b border-[#243444] bg-[#121D28]">
-          <button
-            onClick={() => setActiveTab('kpi')}
-            className={`px-4 py-2 text-xs font-semibold rounded-t-lg border-b-2 transition-all ${
-              activeTab === 'kpi'
-                ? 'border-amber-400 text-amber-300 bg-[#162330]'
-                : 'border-transparent text-slate-400 hover:text-slate-200'
-            }`}
-          >
-            Ringkasan Eksekutif & Prioritas Wilayah
-          </button>
-          <button
-            onClick={() => setActiveTab('raw_text')}
-            className={`px-4 py-2 text-xs font-semibold rounded-t-lg border-b-2 transition-all ${
-              activeTab === 'raw_text'
-                ? 'border-amber-400 text-amber-300 bg-[#162330]'
-                : 'border-transparent text-slate-400 hover:text-slate-200'
-            }`}
-          >
-            Format Teks WhatsApp Forkopimda
-          </button>
+        {/* Tab Navigasi & Filter Kejadian Bencana Spesifik */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 px-5 py-2.5 border-b border-[#243444] bg-[#121D28]">
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setActiveTab('kpi')}
+              className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all ${
+                activeTab === 'kpi'
+                  ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              Ringkasan Eksekutif & Prioritas
+            </button>
+            <button
+              onClick={() => setActiveTab('raw_text')}
+              className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all ${
+                activeTab === 'raw_text'
+                  ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              Format WhatsApp Forkopimda
+            </button>
+          </div>
+
+          {/* Filter Kejadian Darurat Spesifik */}
+          <div className="flex items-center gap-2">
+            <label htmlFor="bencana-filter-select" className="text-[11px] font-mono text-slate-400 shrink-0">Filter Kejadian:</label>
+            <select
+              id="bencana-filter-select"
+              value={selectedBencanaId}
+              onChange={(e) => {
+                const val = e.target.value;
+                setSelectedBencanaId(val);
+                fetchSitrep(val);
+              }}
+              className="text-xs bg-[#0F1720] border border-[#243444] text-slate-200 rounded-lg px-2.5 py-1 focus:outline-none focus:border-amber-400 max-w-[240px] truncate"
+            >
+              <option value="">Semua Kejadian (Rekap Akumulasi)</option>
+              {daftarBencana.map((b) => (
+                <option key={b.id} value={b.id}>
+                  #{b.id} {b.jenis_bencana.toUpperCase()} - {b.wilayah || 'Sumbar'}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
 
         {/* Body Modal */}
         <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6">
-          {loading && !data ? (
+          {authError ? (
+            <div className="py-12 flex flex-col items-center justify-center text-center gap-3 max-w-md mx-auto">
+              <ShieldAlert className="w-12 h-12 text-amber-400" />
+              <h3 className="text-sm font-bold text-white font-display">Akses Khusus Personel Pusdalops & Pimpinan</h3>
+              <p className="text-xs text-slate-400 leading-relaxed">
+                Dokumen resmi Situation Report (SITREP) berisi data taktis operasional Forkopimda. Silakan login melalui tombol <strong className="text-amber-300">Portal Petugas</strong> di header untuk melihat dan mengekspor dokumen ini.
+              </p>
+            </div>
+          ) : loading && !data ? (
             <div className="py-12 flex flex-col items-center justify-center gap-3">
               <RefreshCw className="w-8 h-8 text-amber-400 animate-spin" />
               <p className="text-xs text-slate-400 font-mono">
@@ -212,13 +283,13 @@ export const SitrepModal: React.FC<SitrepModalProps> = ({ isOpen, onClose }) => 
                   <div className="p-3.5 rounded-xl bg-[#162330] border border-[#243444]">
                     <div className="flex items-center gap-2 text-emerald-400 text-xs mb-1">
                       <DollarSign className="w-4 h-4" />
-                      <span>Kerugian Finansial</span>
+                      <span>Estimasi Kerugian</span>
                     </div>
                     <div className="text-xl sm:text-2xl font-bold font-display text-white">
                       Rp {data.kpi.total_kerugian_miliar} <span className="text-xs font-normal text-slate-400">Miliar</span>
                     </div>
                     <div className="text-[10px] text-slate-400 font-mono mt-1">
-                      Estimasi Pemukiman & Fasum
+                      Estimasi Model Indikatif BPBD/BNPB
                     </div>
                   </div>
 
@@ -255,12 +326,12 @@ export const SitrepModal: React.FC<SitrepModalProps> = ({ isOpen, onClose }) => 
 
                   <div className="p-3.5 rounded-xl bg-[#162330] border border-[#243444] flex items-center justify-between">
                     <div>
-                      <span className="text-[11px] text-slate-400 block">EWS Sirine Tsunami Pesisir</span>
+                      <span className="text-[11px] text-slate-400 block">Total Titik Evakuasi Siaga</span>
                       <span className="text-lg font-bold text-amber-300 font-display">
-                        {data.kpi.sirine_aktif} / {data.kpi.sirine_total} Aktif
+                        {(data.kpi.posko_aktif || 0) + (data.kpi.shelter_tes_count || 0)} Lokasi
                       </span>
                     </div>
-                    <Volume2 className="w-6 h-6 text-amber-400/60" />
+                    <ShieldCheck className="w-6 h-6 text-amber-400/60" />
                   </div>
 
                   <div className="p-3.5 rounded-xl bg-[#162330] border border-[#243444] flex items-center justify-between">
@@ -292,7 +363,7 @@ export const SitrepModal: React.FC<SitrepModalProps> = ({ isOpen, onClose }) => 
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-[#243444] font-mono">
-                      {data.wilayah_prioritas.map((w, i) => (
+                      {data.wilayah_prioritas.map((w: SitrepData['wilayah_prioritas'][0], i: number) => (
                         <tr key={w.nama} className="hover:bg-[#162330]/50 transition-colors">
                           <td className="p-3 text-slate-500 font-bold">{i + 1}</td>
                           <td className="p-3 font-sans font-semibold text-slate-200">{w.nama}</td>

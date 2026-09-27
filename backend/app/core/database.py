@@ -10,6 +10,8 @@ Base = declarative_base()
 # Sync Engine (untuk Alembic & utility ETL)
 sync_engine = create_engine(
     settings.sync_database_url,
+    pool_size=settings.DB_POOL_SIZE,
+    max_overflow=settings.DB_MAX_OVERFLOW,
     pool_pre_ping=True,
     echo=False
 )
@@ -18,6 +20,8 @@ SyncSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=sync_eng
 # Async Engine (untuk FastAPI endpoint)
 async_engine = create_async_engine(
     settings.async_database_url,
+    pool_size=settings.DB_POOL_SIZE,
+    max_overflow=settings.DB_MAX_OVERFLOW,
     pool_pre_ping=True,
     echo=False
 )

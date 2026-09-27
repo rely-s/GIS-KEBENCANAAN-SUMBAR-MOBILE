@@ -33,7 +33,7 @@ export default defineConfig({
         globPatterns: ['**/*.{js,css,html,svg,png,json}'],
         runtimeCaching: [
           {
-            urlPattern: /^https:\/\/(mt[0-3]\.google\.com|server\.arcgisonline\.com)\/.*/i,
+            urlPattern: /^https:\/\/(server\.arcgisonline\.com|basemaps\.cartocdn\.com|tile\.openstreetmap\.org)\/.*/i,
             handler: 'CacheFirst',
             options: {
               cacheName: 'basemap-tiles-cache',

@@ -33,8 +33,22 @@ class PoskoInfo(BaseModel):
     lat: float
     lon: float
 
+class ProfilElevasi(BaseModel):
+    elevasi_asal_mdpl: float
+    elevasi_tujuan_mdpl: float
+    elevasi_efektif_mdpl: float
+    gain_elevasi_m: float
+    is_shelter_vertikal: bool
+    aman_tsunami: bool
+    catatan_elevasi: str
+
+class DetourInfo(BaseModel):
+    aktif: bool
+    nama_koridor: str
+    catatan: str
+
 class EvakuasiResponse(BaseModel):
-    alur: str = Field(..., description="ALUR_A (Tsunami) | ALUR_B (Non-Tsunami)")
+    alur: str = Field(..., description="PROTOKOL_TSUNAMI | PROTOKOL_GALODO | PROTOKOL_GEMPA_SESAR | PROTOKOL_ERUPSI")
     jenis_bencana: str
     posko: PoskoInfo
     jarak_km: float
@@ -42,6 +56,9 @@ class EvakuasiResponse(BaseModel):
     geometry: Dict[str, Any]
     instruksi: List[InstruksiLangkah]
     menghindari_blokade: bool
+    detour_info: Optional[DetourInfo] = None
+    profil_elevasi: Optional[ProfilElevasi] = None
+    hazard_warnings: Optional[List[str]] = []
     is_fallback: bool = False
     fallback_info: Optional[Dict[str, Any]] = None
     zonasi_info: Optional[Dict[str, Any]] = None
@@ -109,7 +126,26 @@ async def cek_status_bencana_aktif(
     """)
     tsunami_row = (await db.execute(tsunami_q)).fetchone()
 
-    # 2. Cek peringatan cuaca / lahar dingin
+    # 2. Cek gempa darat dangkal Sesar Semangko lokal (M >= 4.0, kedalaman <= 30km di darat Sumbar)
+    sesar_q = text("""
+        SELECT external_id, magnitude, wilayah_teks, waktu_kejadian, kedalaman_km
+        FROM gempa_bmkg
+        WHERE waktu_kejadian >= now() - INTERVAL '24 hours'
+          AND magnitude >= 4.0
+          AND (kedalaman_km IS NULL OR kedalaman_km <= 35)
+          AND (
+            LOWER(wilayah_teks) LIKE '%bukittinggi%' OR
+            LOWER(wilayah_teks) LIKE '%padang panjang%' OR
+            LOWER(wilayah_teks) LIKE '%solok%' OR
+            LOWER(wilayah_teks) LIKE '%tanah datar%' OR
+            LOWER(wilayah_teks) LIKE '%agam%' OR
+            LOWER(wilayah_teks) LIKE '%pasaman%'
+          )
+        ORDER BY waktu_kejadian DESC LIMIT 1;
+    """)
+    sesar_row = (await db.execute(sesar_q)).fetchone()
+
+    # 3. Cek peringatan cuaca / lahar dingin / erupsi
     cuaca_q = text("""
         SELECT identifier, event, headline, severity, area_desc
         FROM peringatan_cuaca_bmkg
@@ -121,7 +157,7 @@ async def cek_status_bencana_aktif(
     if tsunami_row:
         return {
             "status_siaga": "BAHAYA_TSUNAMI",
-            "alur_rekomendasi": "ALUR_A",
+            "alur_rekomendasi": "PROTOKOL_TSUNAMI",
             "jenis_bencana_aktif": "tsunami",
             "keterangan": f"Peringatan Dini Tsunami Aktif: Gempa M{tsunami_row.magnitude} di {tsunami_row.wilayah_teks}",
             "data": {
@@ -133,7 +169,7 @@ async def cek_status_bencana_aktif(
     elif cuaca_row and ("galodo" in (cuaca_row.event or "").lower() or "lahar" in (cuaca_row.headline or "").lower()):
         return {
             "status_siaga": "SIAGA_GALODO",
-            "alur_rekomendasi": "ALUR_B",
+            "alur_rekomendasi": "PROTOKOL_GALODO",
             "jenis_bencana_aktif": "galodo",
             "keterangan": f"Peringatan Banjir Lahar Dingin (Galodo): {cuaca_row.headline}",
             "data": {
@@ -141,12 +177,25 @@ async def cek_status_bencana_aktif(
                 "area": cuaca_row.area_desc
             }
         }
+    elif sesar_row:
+        return {
+            "status_siaga": "WASPADA_GEMPA_SESAR",
+            "alur_rekomendasi": "PROTOKOL_GEMPA_SESAR",
+            "jenis_bencana_aktif": "gempa",
+            "keterangan": f"Gempa Darat Dangkal Sesar Semangko M{sesar_row.magnitude} di {sesar_row.wilayah_teks}",
+            "data": {
+                "gempa_id": sesar_row.external_id,
+                "magnitude": float(sesar_row.magnitude),
+                "kedalaman": float(sesar_row.kedalaman_km or 10),
+                "waktu": sesar_row.waktu_kejadian.isoformat() if sesar_row.waktu_kejadian else None
+            }
+        }
     else:
         return {
             "status_siaga": "NORMAL_SIAGA",
-            "alur_rekomendasi": "ALUR_B",
+            "alur_rekomendasi": "PROTOKOL_GEMPA_SESAR",
             "jenis_bencana_aktif": "gempa",
-            "keterangan": "Tidak ada peringatan tsunami seketika. Siaga darurat gempa & banjir lokal aktif.",
+            "keterangan": "Tidak ada peringatan tsunami seketika. Siaga darurat kesiapsiagaan bencana aktif.",
             "data": None
         }
 

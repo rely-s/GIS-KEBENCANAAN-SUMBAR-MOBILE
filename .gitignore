@@ -58,3 +58,8 @@ Thumbs.db
 frontend/.vite/
 graphify-out/cache/
 graphify-out/2026-*/
+
+# Local Uploads & Test Artifacts
+backend/uploads/
+test_tile.mvt
+

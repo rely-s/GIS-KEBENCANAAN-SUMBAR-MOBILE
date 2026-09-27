@@ -1,4 +1,5 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
+
 import { 
   Bot, 
   X, 
@@ -51,12 +52,12 @@ export const DisasterChatbot: React.FC<DisasterChatbotProps> = ({
   const [isOpen, setIsOpen] = useState(isEmbedded);
   const [inputText, setInputText] = useState('');
   const [loading, setLoading] = useState(false);
-  const [messages, setMessages] = useState<ChatMessage[]>([
+  const [messages, setMessages] = useState<ChatMessage[]>(() => [
     {
       id: 'welcome',
       sender: 'bot',
       text: 'Halo! Saya Asisten Siaga Bencana Sumatera Barat. Saya siap membantu Anda dengan informasi real-time mengenai shelter evakuasi terdekat, pemantauan sensor gempa BMKG, peringatan cuaca ekstrem, dan SOP mitigasi. Ada yang bisa saya bantu?',
-      timestamp: new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }),
+      timestamp: 'Baru saja',
       saran_pertanyaan: [
         'Di mana shelter tsunami terdekat?',
         'Bagaimana status gempa terkini?',
@@ -64,6 +65,7 @@ export const DisasterChatbot: React.FC<DisasterChatbotProps> = ({
       ]
     }
   ]);
+
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -80,7 +82,7 @@ export const DisasterChatbot: React.FC<DisasterChatbotProps> = ({
     }
   }, [isOpen, isEmbedded, messages]);
 
-  const handleSendMessage = async (textToSend?: string) => {
+  const handleSendMessage = useCallback(async (textToSend?: string) => {
     const query = (textToSend || inputText).trim();
     if (!query || loading) return;
 
@@ -132,13 +134,14 @@ export const DisasterChatbot: React.FC<DisasterChatbotProps> = ({
     } finally {
       setLoading(false);
     }
-  };
+  }, [inputText, loading, userCoords, selectedWilayahId]);
 
-  const handleFlyTo = (loc: { lat: number; lng: number }) => {
+  const handleFlyTo = useCallback((loc: { lat: number; lng: number }) => {
     if (onFlyToLocation) {
       onFlyToLocation({ lat: loc.lat, lng: loc.lng, zoom: 14.5 });
     }
-  };
+  }, [onFlyToLocation]);
+
 
   const chatContent = (
     <div className={`flex flex-col ${isEmbedded ? 'h-[440px] w-full' : 'w-[92vw] sm:w-[380px] md:w-[410px] h-[520px] max-h-[82vh] rounded-2xl bg-[#09111A]/98 backdrop-blur-2xl border border-cyan-700/40 shadow-[0_15px_40px_rgba(0,0,0,0.8)] overflow-hidden animate-in fade-in duration-200'}`}>

@@ -1,17 +1,17 @@
-import React, { useEffect, useRef, useState, useCallback } from 'react';
+import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import * as maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { Protocol } from 'pmtiles';
-import type { LayerVisibilityState } from './LayerControlPanel';
+import type { LayerVisibilityState } from './types';
 import { 
   sesarSemangkoGeoJSON, 
   megathrustMentawaiGeoJSON, 
   zonaTsunamiPadangGeoJSON,
-  cuacaAlertZonesGeoJSON,
   tsunamiRunUpGeoJSON,
   sesarBufferGeoJSON
 } from './data/geologiData';
 import { registerCartoIcons } from './cartoIcons';
+import { RightMapControlDock } from './RightMapControlDock';
 
 // Registrasi Protokol PMTiles untuk MapLibre GL JS (05-peta-gis.md)
 try {
@@ -51,13 +51,46 @@ interface MapCanvasProps {
   gempaData?: GempaInfo | null;
   styleVariant?: BasemapStyle;
   is3DTerrain?: boolean;
+  onStyleChange?: (style: BasemapStyle) => void;
+  onToggle3D?: () => void;
   modeHematDaya?: boolean;
   layerVisibility?: LayerVisibilityState;
+  layerOpacities?: Record<string, number>;
+  cuacaAlerts?: any[];
   isPickingLocation?: boolean;
   onPickLocation?: (coords: { lat: number; lng: number }) => void;
-  onCoordinatesChange?: (coords: { lng: number; lat: number; zoom: number }) => void;
+  onCoordinatesChange?: (coords: { lat: number; lng: number; zoom: number }) => void;
   onSelectWilayah?: (wilayahId: number, properties?: any) => void;
+  onPoskoClick?: (posko: any) => void;
+  onJalanClick?: (jalan: any) => void;
+  onAncamanClick?: (ancaman: any) => void;
 }
+
+// Koordinat Resmi Stasiun/Simpul Pantauan Cuaca BMKG di 19 Kabupaten/Kota Se-Sumatera Barat
+const BMKG_NODES_COORDS: Record<string, { lat: number; lng: number }> = {
+  // 7 Kota Otonom
+  '13.71.01.1001': { lat: -0.947, lng: 100.354 }, // Kota Padang (Pesisir & Dataran Rendah)
+  '13.75.01.1001': { lat: -0.305, lng: 100.369 }, // Kota Bukittinggi (Dataran Tinggi)
+  '13.72.01.1001': { lat: -0.798, lng: 100.655 }, // Kota Solok (Aliran Batang Lembang)
+  '13.74.01.1001': { lat: -0.463, lng: 100.400 }, // Kota Padang Panjang (Lembah Anai / Lereng Marapi)
+  '13.76.01.1001': { lat: -0.225, lng: 100.631 }, // Kota Payakumbuh (DAS Batang Agam)
+  '13.73.01.1001': { lat: -0.681, lng: 100.777 }, // Kota Sawahlunto (Perbukitan Batubara)
+  '13.77.01.1001': { lat: -0.626, lng: 100.121 }, // Kota Pariaman (Pesisir Pantai)
+
+  // 12 Kabupaten
+  '13.06.01.2001': { lat: -0.375, lng: 100.410 }, // Kab. Agam (Lereng Marapi / Maninjau)
+  '13.04.01.2001': { lat: -0.470, lng: 100.380 }, // Kab. Tanah Datar (Lembah Anai)
+  '13.05.01.2001': { lat: -0.640, lng: 100.280 }, // Kab. Padang Pariaman (DAS Batang Anai)
+  '13.01.01.2001': { lat: -1.350, lng: 100.570 }, // Kab. Pesisir Selatan (Painan / Batang Tapan)
+  '13.12.01.2001': { lat: 0.180, lng: 99.820 },  // Kab. Pasaman Barat (Simpang Empat)
+  '13.08.01.2001': { lat: 0.147, lng: 100.170 }, // Kab. Pasaman (Lubuk Sikaping)
+  '13.07.01.2001': { lat: -0.142, lng: 100.666 }, // Kab. Lima Puluh Kota (Harau / Pangkalan)
+  '13.02.06.2001': { lat: -1.085, lng: 100.730 }, // Kab. Solok (Lembah Gumanti / Danau Kembar)
+  '13.11.01.2001': { lat: -1.480, lng: 101.120 }, // Kab. Solok Selatan (Sungai Pagu / Batang Suliti)
+  '13.03.01.2001': { lat: -0.691, lng: 101.001 }, // Kab. Sijunjung (Muaro Sijunjung)
+  '13.10.01.2001': { lat: -0.986, lng: 101.371 }, // Kab. Dharmasraya (Pulau Punjung / Batang Hari)
+  '13.09.01.2001': { lat: -2.024, lng: 99.594 },  // Kab. Kepulauan Mentawai (Tuapejat / Siberut)
+};
 
 export const MapCanvas: React.FC<MapCanvasProps> = ({
   selectedWilayahId,
@@ -72,12 +105,19 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
   gempaData,
   styleVariant = 'satelit',
   is3DTerrain = false,
+  onStyleChange,
+  onToggle3D,
   modeHematDaya,
   layerVisibility,
+  layerOpacities,
+  cuacaAlerts = [],
   isPickingLocation = false,
   onPickLocation,
   onCoordinatesChange,
   onSelectWilayah,
+  onPoskoClick,
+  onJalanClick,
+  onAncamanClick,
 }) => {
   // 3D Terrain mati secara default untuk performa ringan & dingin
   const active3D = is3DTerrain ?? (modeHematDaya !== undefined ? !modeHematDaya : false);
@@ -85,22 +125,102 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
   const map = useRef<maplibregl.Map | null>(null);
   const [mapLoaded, setMapLoaded] = useState(false);
   const [mousePos, setMousePos] = useState<{ x: number; y: number } | null>(null);
+  const [mapBearing, setMapBearing] = useState(0);
+
+  // GeoJSON Peringatan Cuaca Dinamis 100% dari API BMKG (Bukan Data Statis Rekayasa)
+  const dynamicCuacaGeoJSON = useMemo(() => {
+    if (!cuacaAlerts || cuacaAlerts.length === 0) {
+      return { type: 'FeatureCollection', features: [] };
+    }
+    const features: any[] = [];
+    cuacaAlerts.forEach((alert) => {
+      const codeMatch = alert.identifier?.replace('BMKG_API_', '');
+      const coord = codeMatch ? BMKG_NODES_COORDS[codeMatch] : null;
+      if (!coord) return;
+
+      const isSevere = alert.severity === 'Severe';
+      const isModerate = alert.severity === 'Moderate';
+      const color = isSevere ? '#EF4444' : isModerate ? '#F59E0B' : '#3B82F6';
+
+      // 1. Simpul Titik Sensor / Peringatan Cuaca BMKG
+      features.push({
+        type: 'Feature',
+        geometry: {
+          type: 'Point',
+          coordinates: [coord.lng, coord.lat],
+        },
+        properties: {
+          id: alert.id,
+          nama: alert.area_desc,
+          tingkat_bahaya: alert.severity,
+          curah_hujan: alert.event,
+          ancaman: alert.description || alert.headline,
+          wilayah_terdampak: alert.area_desc,
+          warna: color,
+        },
+      });
+
+      // 2. Buffer Zona Bahaya Cuaca / Lahar Dingin jika Cuaca Sedang/Tinggi
+      if (isSevere || isModerate) {
+        const radiusDeg = isSevere ? 0.08 : 0.045; // Radius adaptif ~5km - 9km
+        const steps = 18;
+        const ringCoords: number[][] = [];
+        for (let i = 0; i <= steps; i++) {
+          const angle = (i * 2 * Math.PI) / steps;
+          const dx = radiusDeg * Math.cos(angle);
+          const dy = (radiusDeg * 0.88) * Math.sin(angle);
+          ringCoords.push([coord.lng + dx, coord.lat + dy]);
+        }
+        features.push({
+          type: 'Feature',
+          geometry: {
+            type: 'Polygon',
+            coordinates: [ringCoords],
+          },
+          properties: {
+            id: `poly-${alert.id}`,
+            nama: alert.area_desc,
+            tingkat_bahaya: alert.severity,
+            curah_hujan: alert.event,
+            ancaman: alert.headline,
+            wilayah_terdampak: alert.area_desc,
+            warna: color,
+          },
+        });
+      }
+    });
+
+    return {
+      type: 'FeatureCollection',
+      features,
+    };
+  }, [cuacaAlerts]);
 
   // Sync ref untuk interaksi klik peta dinamis & isolasi siklus render reaktif
   const isPickingLocationRef = useRef(isPickingLocation);
-  isPickingLocationRef.current = isPickingLocation;
   const onPickLocationRef = useRef(onPickLocation);
-  onPickLocationRef.current = onPickLocation;
   const onSelectWilayahRef = useRef(onSelectWilayah);
-  onSelectWilayahRef.current = onSelectWilayah;
+  const onPoskoClickRef = useRef(onPoskoClick);
+  const onJalanClickRef = useRef(onJalanClick);
+  const onAncamanClickRef = useRef(onAncamanClick);
   const selectedWilayahIdRef = useRef(selectedWilayahId);
-  selectedWilayahIdRef.current = selectedWilayahId;
   const styleVariantRef = useRef(styleVariant);
-  styleVariantRef.current = styleVariant;
   const currentStyleVariantRef = useRef<BasemapStyle>(styleVariant);
   const layerVisibilityRef = useRef(layerVisibility);
-  layerVisibilityRef.current = layerVisibility;
   const hoverPopupRef = useRef<maplibregl.Popup | null>(null);
+
+  useEffect(() => {
+    isPickingLocationRef.current = isPickingLocation;
+    onPickLocationRef.current = onPickLocation;
+    onSelectWilayahRef.current = onSelectWilayah;
+    onPoskoClickRef.current = onPoskoClick;
+    onJalanClickRef.current = onJalanClick;
+    onAncamanClickRef.current = onAncamanClick;
+    selectedWilayahIdRef.current = selectedWilayahId;
+    styleVariantRef.current = styleVariant;
+    layerVisibilityRef.current = layerVisibility;
+  }, [isPickingLocation, onPickLocation, onSelectWilayah, onPoskoClick, onJalanClick, onAncamanClick, selectedWilayahId, styleVariant, layerVisibility]);
+
 
   // Markers
   const userMarkerRef = useRef<maplibregl.Marker | null>(null);
@@ -114,7 +234,6 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
       choropleth: true,
       poskoEvakuasi: true,
       shelterTes: true,
-      sirineTsunami: true,
       jalanTerputus: true,
       gempa: true,
       cuaca: true,
@@ -140,16 +259,13 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
     setLayerVis('choropleth-kecamatan-line', currentVis.choropleth);
     setLayerVis('choropleth-kecamatan-highlight', currentVis.choropleth && !!selectedWilayahIdRef.current);
 
-    // 2. Fasilitas & Mitigasi (Posko Pengungsi, Faskes, Shelter TES, Sirine EWS)
+    // 2. Fasilitas & Mitigasi (Posko Pengungsi, Faskes, Shelter TES)
     setLayerVis('posko-evakuasi-symbol', currentVis.poskoEvakuasi ?? true);
     setLayerVis('posko-evakuasi-circle', currentVis.poskoEvakuasi ?? true);
     setLayerVis('posko-evakuasi-label', currentVis.poskoEvakuasi ?? true);
     setLayerVis('shelter-tes-symbol', currentVis.shelterTes);
     setLayerVis('shelter-tes-circle', currentVis.shelterTes);
     setLayerVis('shelter-tes-halo', currentVis.shelterTes);
-    setLayerVis('sirine-tsunami-symbol', currentVis.sirineTsunami);
-    setLayerVis('sirine-tsunami-circle', currentVis.sirineTsunami);
-    setLayerVis('sirine-tsunami-halo', currentVis.sirineTsunami);
     setLayerVis('jalan-terputus-line', currentVis.jalanTerputus);
     setLayerVis('jalan-terputus-line-casing', currentVis.jalanTerputus);
 
@@ -370,7 +486,7 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
         id: 'posko-evakuasi-symbol',
         type: 'symbol',
         source: 'posko-evakuasi-src',
-        filter: ['all', ['!=', ['get', 'jenis'], 'sirine_tsunami'], ['!=', ['get', 'jenis'], 'shelter_tes_tea']],
+        filter: ['!=', ['get', 'jenis'], 'shelter_tes_tea'],
         layout: {
           'icon-image': [
             'match',
@@ -401,7 +517,7 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
         id: 'posko-evakuasi-circle',
         type: 'circle',
         source: 'posko-evakuasi-src',
-        filter: ['all', ['!=', ['get', 'jenis'], 'sirine_tsunami'], ['!=', ['get', 'jenis'], 'shelter_tes_tea']],
+        filter: ['!=', ['get', 'jenis'], 'shelter_tes_tea'],
         maxzoom: 10,
         paint: {
           'circle-radius': 6,
@@ -464,64 +580,6 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
       });
     }
 
-    // 5. Source & Layer Sirine EWS Tsunami BPBD (ISO 22324 / BMKG)
-    if (!mapInstance.getSource('sirine-tsunami-src')) {
-      mapInstance.addSource('sirine-tsunami-src', {
-        type: 'geojson',
-        data: '/api/posko?jenis=sirine_tsunami&include_nonaktif=true',
-      });
-    }
-
-    if (!mapInstance.getLayer('sirine-tsunami-symbol')) {
-      mapInstance.addLayer({
-        id: 'sirine-tsunami-symbol',
-        type: 'symbol',
-        source: 'sirine-tsunami-src',
-        layout: {
-          'icon-image': [
-            'match',
-            ['get', 'status'],
-            'aktif',
-            'carto-sirine-aktif',
-            'carto-sirine-maint'
-          ],
-          'icon-size': 0.7,
-          'icon-allow-overlap': true,
-          'text-field': ['get', 'nama'],
-          'text-size': 10,
-          'text-offset': [0, 1.45],
-          'text-anchor': 'top',
-          'text-max-width': 12,
-        },
-        minzoom: 11,
-        paint: {
-          'text-color': '#FEF08A',
-          'text-halo-color': '#0B131D',
-          'text-halo-width': 2.0,
-        },
-      });
-    }
-
-    if (!mapInstance.getLayer('sirine-tsunami-circle')) {
-      mapInstance.addLayer({
-        id: 'sirine-tsunami-circle',
-        type: 'circle',
-        source: 'sirine-tsunami-src',
-        maxzoom: 11,
-        paint: {
-          'circle-radius': 5.5,
-          'circle-color': [
-            'match',
-            ['get', 'status'],
-            'aktif',
-            '#D97706',
-            '#64748B'
-          ],
-          'circle-stroke-width': 1.8,
-          'circle-stroke-color': '#FFFFFF',
-        },
-      });
-    }
 
     // 4. Source & Layer Rute Evakuasi
     if (!mapInstance.getSource('route-evakuasi-src')) {
@@ -691,11 +749,11 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
       });
     }
 
-    // 8. Peringatan Dini Cuaca & Banjir Lahar Hujan (Galodo Marapi-Singgalang)
+    // 8. Peringatan Dini Cuaca & Ancaman Hidrometeorologis (100% Dinamis dari Sensor BMKG)
     if (!mapInstance.getSource('cuaca-zone-src')) {
       mapInstance.addSource('cuaca-zone-src', {
         type: 'geojson',
-        data: cuacaAlertZonesGeoJSON,
+        data: { type: 'FeatureCollection', features: [] },
       });
     }
 
@@ -853,22 +911,9 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
       maxTileCacheSize: 80,
     });
 
-    mapInstance.addControl(
-      new maplibregl.NavigationControl({
-        visualizePitch: true,
-        showZoom: true,
-        showCompass: true,
-      }),
-      'top-right'
-    );
-
-    mapInstance.addControl(
-      new maplibregl.GeolocateControl({
-        positionOptions: { enableHighAccuracy: true },
-        trackUserLocation: true,
-      }),
-      'top-right'
-    );
+    mapInstance.on('rotate', () => {
+      setMapBearing(mapInstance.getBearing());
+    });
 
     mapInstance.addControl(
       new maplibregl.ScaleControl({
@@ -890,6 +935,7 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
     mapInstance.on('load', async () => {
       setMapLoaded(true);
       await registerCartoIcons(mapInstance);
+
       setupCustomLayers(mapInstance, styleVariantRef.current);
       applyLayerVisibility(mapInstance, layerVisibilityRef.current);
 
@@ -974,41 +1020,7 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
       mapInstance.on('mousemove', 'shelter-tes-circle', handleShelterHover);
       mapInstance.on('mouseleave', 'shelter-tes-circle', handleShelterLeave);
 
-      // Helper Tooltip & Popup Sirine EWS Tsunami BPBD (ISO 22324 / BMKG)
-      const handleSirineHover = (e: any) => {
-        mapInstance.getCanvas().style.cursor = 'pointer';
-        if (e.features && e.features.length > 0) {
-          const p = e.features[0].properties;
-          const isAktif = p.status === 'aktif';
-          hoverPopup
-            .setLngLat(e.lngLat)
-            .setHTML(`
-              <div style="font-family: 'Inter', -apple-system, sans-serif; width: 250px; box-sizing: border-box; color: #F8FAFC;">
-                <div style="display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid rgba(245,158,11,0.3); padding-bottom: 5px; margin-bottom: 6px;">
-                  <span style="font-weight: 800; color: ${isAktif ? '#F59E0B' : '#94A3B8'}; font-size: 10px; letter-spacing: 0.02em;">
-                    🚨 SIRINE EWS TSUNAMI BPBD
-                  </span>
-                  <span style="font-size: 9px; font-weight: 700; padding: 1.5px 6px; border-radius: 4px; ${isAktif ? 'background: rgba(245,158,11,0.2); color: #FCD34D; border: 1px solid rgba(245,158,11,0.4);' : 'background: rgba(148,163,184,0.2); color: #94A3B8; border: 1px solid rgba(148,163,184,0.3);'}">
-                    ${isAktif ? 'SIAGA AKTIF' : 'PEMELIHARAAN'}
-                  </span>
-                </div>
-                <div style="font-weight: 800; color: #FFF; font-size: 13px; margin-bottom: 4px;">${p.nama}</div>
-                <div style="color: #94A3B8; font-size: 10px;">Standar ISO 22324 &bull; Radius Akustik Efektif: 2.0 km</div>
-              </div>
-            `)
-            .addTo(mapInstance);
-        }
-      };
 
-      const handleSirineLeave = () => {
-        mapInstance.getCanvas().style.cursor = '';
-        hoverPopup.remove();
-      };
-
-      mapInstance.on('mousemove', 'sirine-tsunami-symbol', handleSirineHover);
-      mapInstance.on('mouseleave', 'sirine-tsunami-symbol', handleSirineLeave);
-      mapInstance.on('mousemove', 'sirine-tsunami-circle', handleSirineHover);
-      mapInstance.on('mouseleave', 'sirine-tsunami-circle', handleSirineLeave);
 
       // Tooltip Jalan Terputus
       mapInstance.on('mousemove', 'jalan-terputus-line', (e) => {
@@ -1141,7 +1153,7 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
           </div>
           <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 10px; margin-bottom: 6px;">
             <span style="background: rgba(244,63,94,0.2); color: #FDA4AF; border: 1px solid rgba(244,63,94,0.4); border-radius: 4px; padding: 1.5px 6px; font-weight: 700;">
-              ⚡ Potensi M 8.8 – 8.9 SR
+              ⚡ Potensi Maksimum M 8.9 (Mw)
             </span>
             <span style="background: rgba(245,158,11,0.2); color: #FCD34D; border: 1px solid rgba(245,158,11,0.4); border-radius: 4px; padding: 1.5px 6px; font-weight: 700;">
               Seismic Gap Aktif
@@ -1171,8 +1183,8 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
               <span>⚠️</span> <span>PANDUAN PENYELAMATAN (JIKA GEMPA &gt; 1 MENIT):</span>
             </div>
             <div style="color: #F1F5F9; margin-bottom: 5px;">
-              <strong style="color: #38BDF8;">🏝️ Khusus Kepulauan Mentawai:</strong><br/>
-              Segera lari ke <strong style="color: #FDE047;">perbukitan / dataran tinggi alami di pedalaman pulau (&gt; 15 mdpl)</strong>. JANGAN menunggu sirine &amp; jangan mencari Bypass.
+              <strong style="color: #38BDF8;">🏝️ Pedoman Warga Mentawai:</strong><br/>
+              Evakuasi mandiri ke <strong style="color: #FDE047;">perbukitan / dataran tinggi alami di pedalaman pulau (&gt; 15 mdpl)</strong> segera setelah gempa berhenti. Jangan menunggu bunyi sirine.
             </div>
             <div style="color: #F1F5F9;">
               <strong style="color: #CBD5E1;">🏙️ Daratan Pesisir (Padang, Pariaman, Pessel):</strong><br/>
@@ -1275,23 +1287,27 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
         hoverPopup.remove();
       });
 
-      // Tooltip Titik Pos Pantau Lahar / Sensor Anai
+      // Tooltip Titik Stasiun Pantau Cuaca & Hidrometeorologi BMKG
       mapInstance.on('mousemove', 'cuaca-point-circle', (e) => {
         mapInstance.getCanvas().style.cursor = 'pointer';
         if (e.features && e.features.length > 0) {
           const p = e.features[0].properties;
+          const badgeColor = p.tingkat_bahaya === 'Severe' ? '#EF4444' : p.tingkat_bahaya === 'Moderate' ? '#F59E0B' : '#3B82F6';
           hoverPopup
             .setLngLat(e.lngLat)
             .setHTML(`
-              <div style="font-family: 'Inter', -apple-system, sans-serif; width: 240px; box-sizing: border-box; color: #F8FAFC;">
-                <div style="display: flex; align-items: center; gap: 5px; border-bottom: 1px solid rgba(239,68,68,0.3); padding-bottom: 4px; margin-bottom: 6px;">
-                  <span style="font-weight: 800; color: #EF4444; font-size: 10.5px;">🚨 POS PANTAU LAHAR ANAI</span>
+              <div style="font-family: 'Inter', -apple-system, sans-serif; width: 260px; box-sizing: border-box; color: #F8FAFC;">
+                <div style="display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid rgba(59,130,246,0.3); padding-bottom: 5px; margin-bottom: 6px;">
+                  <span style="font-weight: 800; color: #60A5FA; font-size: 10px; letter-spacing: 0.5px;">📡 STASIUN PANTAU CUACA BMKG</span>
+                  <span style="font-size: 9px; font-weight: 700; color: ${badgeColor}; background: rgba(255,255,255,0.08); padding: 1px 6px; border-radius: 4px; border: 1px solid ${badgeColor}40;">
+                    ${p.tingkat_bahaya || 'NORMAL'}
+                  </span>
                 </div>
-                <div style="font-weight: 800; color: #FFF; font-size: 12.5px; margin-bottom: 3px;">${p.nama}</div>
-                <div style="color: #F87171; font-size: 10.5px; font-weight: bold; margin-bottom: 2px;">
-                  Curah Hujan: ${p.curah_hujan} (${p.tingkat_bahaya})
+                <div style="font-weight: 800; color: #FFF; font-size: 12.5px; margin-bottom: 4px;">${p.nama}</div>
+                <div style="color: #93C5FD; font-size: 11px; font-weight: 600; margin-bottom: 3px; display: flex; align-items: center; gap: 4px;">
+                  <span>🌧️</span> <span>Curah Hujan: ${p.curah_hujan || 'Normal'}</span>
                 </div>
-                <div style="color: #CBD5E1; font-size: 9.5px;">${p.kondisi || ''}</div>
+                ${p.ancaman ? `<div style="color: #FCA5A5; font-size: 9.5px; background: rgba(239,68,68,0.12); border: 1px solid rgba(239,68,68,0.25); border-radius: 6px; padding: 4px 6px; margin-top: 4px; line-height: 1.35;">⚠️ <strong>Potensi:</strong> ${p.ancaman}</div>` : ''}
               </div>
             `)
             .addTo(mapInstance);
@@ -1414,6 +1430,143 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
         }
       });
 
+      // =======================================================================
+      // PENYELESAIAN DEAD-CLICK & INTERAKSI SENTUH LAYAR LAPANGAN (FASE 4)
+      // =======================================================================
+
+      // 1. Klik Layer Posko & Shelter TES
+      const poskoLayerIds = [
+        'posko-evakuasi-symbol', 'posko-evakuasi-circle',
+        'shelter-tes-symbol', 'shelter-tes-circle'
+      ];
+
+      poskoLayerIds.forEach((layerId) => {
+        if (mapInstance.getLayer(layerId)) {
+          mapInstance.on('click', layerId, (e) => {
+            if (isPickingLocationRef.current) return;
+            hoverPopup.remove();
+            e.originalEvent.stopPropagation();
+            if (e.features && e.features.length > 0 && onPoskoClickRef.current) {
+              const props = e.features[0].properties || {};
+              const coords = (e.features[0].geometry as any)?.coordinates;
+              const lat = coords ? coords[1] : e.lngLat.lat;
+              const lon = coords ? coords[0] : e.lngLat.lng;
+              let fasilitasParsed: string[] = [];
+              try {
+                if (typeof props.fasilitas === 'string') {
+                  fasilitasParsed = JSON.parse(props.fasilitas);
+                } else if (Array.isArray(props.fasilitas)) {
+                  fasilitasParsed = props.fasilitas;
+                }
+              } catch (_) {}
+
+              onPoskoClickRef.current({
+                ...props,
+                lat,
+                lon,
+                fasilitas: fasilitasParsed
+              });
+            }
+          });
+          mapInstance.on('mouseenter', layerId, () => {
+            if (!isPickingLocationRef.current) mapInstance.getCanvas().style.cursor = 'pointer';
+          });
+          mapInstance.on('mouseleave', layerId, () => {
+            if (!isPickingLocationRef.current) mapInstance.getCanvas().style.cursor = '';
+          });
+        }
+      });
+
+      // 2. Klik Layer Jalan Terputus (Blokade)
+      if (mapInstance.getLayer('jalan-terputus-line')) {
+        mapInstance.on('click', 'jalan-terputus-line', (e) => {
+          if (isPickingLocationRef.current) return;
+          hoverPopup.remove();
+          e.originalEvent.stopPropagation();
+          if (e.features && e.features.length > 0 && onJalanClickRef.current) {
+            const props = e.features[0].properties || {};
+            onJalanClickRef.current({
+              id: props.id,
+              alasan: props.alasan || 'Ruas Jalan Terputus',
+              deskripsi: props.deskripsi,
+              status: props.status || 'aktif'
+            });
+          }
+        });
+        mapInstance.on('mouseenter', 'jalan-terputus-line', () => {
+          if (!isPickingLocationRef.current) mapInstance.getCanvas().style.cursor = 'pointer';
+        });
+        mapInstance.on('mouseleave', 'jalan-terputus-line', () => {
+          if (!isPickingLocationRef.current) mapInstance.getCanvas().style.cursor = '';
+        });
+      }
+
+      // 3. Klik Layer Sesar Semangko (Patahan Aktif Darat)
+      const sesarLayers = ['sesar-semangko-core', 'sesar-semangko-casing'];
+      sesarLayers.forEach((layerId) => {
+        if (mapInstance.getLayer(layerId)) {
+          mapInstance.on('click', layerId, (e) => {
+            if (isPickingLocationRef.current) return;
+            hoverPopup.remove();
+            e.originalEvent.stopPropagation();
+            if (e.features && e.features.length > 0 && onAncamanClickRef.current) {
+              const p = e.features[0].properties || {};
+              onAncamanClickRef.current({
+                tipe: 'sesar',
+                judul: p.nama || 'Patahan Aktif Sesar Semangko',
+                subJudul: `Potensi: ${p.potensi_mag || 'M 7.0 - 7.6'} • Slip Rate: ${p.slip_rate || '11-27 mm/th'}`,
+                badge: 'SESAR AKTIF DARAT',
+                properties: p
+              });
+            }
+          });
+        }
+      });
+
+      // 4. Klik Layer Megathrust Mentawai (Zona Subduksi)
+      const megathrustLayers = ['megathrust-trench-line', 'megathrust-zone-fill'];
+      megathrustLayers.forEach((layerId) => {
+        if (mapInstance.getLayer(layerId)) {
+          mapInstance.on('click', layerId, (e) => {
+            if (isPickingLocationRef.current) return;
+            hoverPopup.remove();
+            e.originalEvent.stopPropagation();
+            if (e.features && e.features.length > 0 && onAncamanClickRef.current) {
+              const p = e.features[0].properties || {};
+              onAncamanClickRef.current({
+                tipe: 'megathrust',
+                judul: p.nama || 'Zona Kuncian Megathrust Mentawai',
+                subJudul: 'Potensi Maksimum M 8.9 (Mw) • Sunda Trench & Locked Patch',
+                badge: 'ZONA SUBDUKSI SEISMIK',
+                properties: p
+              });
+            }
+          });
+        }
+      });
+
+      // 5. Klik Layer Peringatan Cuaca & Pos Pantau Lahar
+      const cuacaLayers = ['cuaca-zone-fill', 'cuaca-point-circle'];
+      cuacaLayers.forEach((layerId) => {
+        if (mapInstance.getLayer(layerId)) {
+          mapInstance.on('click', layerId, (e) => {
+            if (isPickingLocationRef.current) return;
+            hoverPopup.remove();
+            e.originalEvent.stopPropagation();
+            if (e.features && e.features.length > 0 && onAncamanClickRef.current) {
+              const p = e.features[0].properties || {};
+              onAncamanClickRef.current({
+                tipe: 'cuaca',
+                judul: p.nama || 'Peringatan Cuaca Ekstrem BMKG',
+                subJudul: `Status: ${p.tingkat_bahaya || 'Siaga'} • Wilayah: ${p.wilayah_terdampak || 'Sumbar'}`,
+                badge: 'PERINGATAN BMKG',
+                properties: p
+              });
+            }
+          });
+        }
+      });
+
       // Tooltip Hover pada Garis Batas Perkecamatan
       mapInstance.on('mousemove', 'selected-boundaries-fill', (e) => {
         if (isPickingLocationRef.current) return;
@@ -1497,8 +1650,6 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
           'posko-evakuasi-circle', 
           'shelter-tes-symbol',
           'shelter-tes-circle', 
-          'sirine-tsunami-symbol',
-          'sirine-tsunami-circle', 
           'jalan-terputus-line',
           'sesar-semangko-core',
           'megathrust-trench-line',
@@ -1563,8 +1714,10 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
       hoverPopup.remove();
       mapInstance.remove();
       map.current = null;
+      setMapLoaded(false);
     };
   }, []);
+
 
   // Handler Pergantian Style Terang / Gelap Kustom (05-peta-gis.md)
   useEffect(() => {
@@ -1717,7 +1870,7 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
     }
   }, [jalanVersion, mapLoaded]);
 
-  // Update Posko, Shelter TES, & Sirine EWS saat versi posko bertambah
+  // Update Posko & Shelter TES saat versi posko bertambah
   useEffect(() => {
     if (!map.current || !mapLoaded) return;
     const pSrc = map.current.getSource('posko-evakuasi-src') as maplibregl.GeoJSONSource;
@@ -1728,10 +1881,6 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
     if (sSrc) {
       sSrc.setData(`/api/posko?jenis=shelter_tes_tea&t=${Date.now()}`);
     }
-    const sirSrc = map.current.getSource('sirine-tsunami-src') as maplibregl.GeoJSONSource;
-    if (sirSrc) {
-      sirSrc.setData(`/api/posko?jenis=sirine_tsunami&include_nonaktif=true&t=${Date.now()}`);
-    }
   }, [poskoVersion, mapLoaded]);
 
   // Update Layer Visibility Dinamis dari LayerControlPanel
@@ -1739,6 +1888,34 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
     if (!map.current || !mapLoaded) return;
     applyLayerVisibility(map.current, layerVisibility);
   }, [layerVisibility, mapLoaded, applyLayerVisibility]);
+
+  // Update Opasitas Lapisan Spasial Dinamis
+  useEffect(() => {
+    if (!map.current || !mapLoaded || !layerOpacities) return;
+    const m = map.current;
+    try {
+      if (layerOpacities.choropleth !== undefined && m.getLayer('choropleth-kecamatan-fill')) {
+        m.setPaintProperty('choropleth-kecamatan-fill', 'fill-opacity', layerOpacities.choropleth);
+      }
+      if (layerOpacities.zonaTsunami !== undefined && m.getLayer('tsunami-zona-merah-fill')) {
+        m.setPaintProperty('tsunami-zona-merah-fill', 'fill-opacity', layerOpacities.zonaTsunami);
+      }
+      if (layerOpacities.tsunamiRunup !== undefined && m.getLayer('tsunami-runup-fill')) {
+        m.setPaintProperty('tsunami-runup-fill', 'fill-opacity', layerOpacities.tsunamiRunup);
+      }
+      if (layerOpacities.cuaca !== undefined && m.getLayer('cuaca-zone-fill')) {
+        m.setPaintProperty('cuaca-zone-fill', 'fill-opacity', layerOpacities.cuaca);
+      }
+      if (layerOpacities.sesarBuffer !== undefined && m.getLayer('sesar-buffer-fill')) {
+        m.setPaintProperty('sesar-buffer-fill', 'fill-opacity', layerOpacities.sesarBuffer);
+      }
+      if (layerOpacities.megathrust !== undefined && m.getLayer('megathrust-zone-fill')) {
+        m.setPaintProperty('megathrust-zone-fill', 'fill-opacity', layerOpacities.megathrust);
+      }
+    } catch (err) {
+      console.debug('Gagal menerapkan opasitas layer:', err);
+    }
+  }, [layerOpacities, mapLoaded]);
 
   // Efek Kursor saat Mode Penentuan Titik Evakuasi di Peta Aktif
   useEffect(() => {
@@ -1838,42 +2015,65 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
     }
   }, [poskoCoords]);
 
-  // Marker Gempa BMKG
+  // Marker Gempa & Potensi Tsunami BMKG (High-Fidelity Waves Visualizer)
   useEffect(() => {
     if (!map.current) return;
     if (gempaData && gempaData.lon && gempaData.lat) {
       if (!gempaMarkerRef.current) {
         const el = document.createElement('div');
-        el.className = 'gis-gempa-epicenter-marker';
+        el.className = 'gis-gempa-epicenter-marker group';
         el.title = `Pusat Gempa M ${gempaData.magnitude} - ${gempaData.wilayah_teks}`;
+        
+        const isTsunami = !!gempaData.potensi_tsunami;
+        
         el.innerHTML = `
-          <div style="position: relative; width: 42px; height: 42px; cursor: pointer; display: flex; align-items: center; justify-content: center;">
-            <div style="position: absolute; width: 100%; height: 100%; border-radius: 50%; background: rgba(239, 68, 68, 0.35); animation: ping 1.2s cubic-bezier(0, 0, 0.2, 1) infinite;"></div>
-            <div style="position: absolute; width: 28px; height: 28px; border-radius: 50%; background: rgba(239, 68, 68, 0.85); border: 2.5px solid #FFFFFF; display: flex; align-items: center; justify-content: center; color: white; font-weight: 800; font-size: 10.5px; box-shadow: 0 0 12px rgba(239, 68, 68, 0.9);">
-              M${gempaData.magnitude}
+          <div style="position: relative; width: 64px; height: 64px; cursor: pointer; display: flex; align-items: center; justify-content: center;">
+            <!-- 3 Cincin Gelombang Tsunami Ripple -->
+            <div class="animate-tsunami-ring-1" style="position: absolute; width: 100%; height: 100%; border-radius: 50%; background: ${isTsunami ? 'rgba(239, 68, 68, 0.45)' : 'rgba(244, 63, 94, 0.35)'}; border: 1.5px solid rgba(239, 68, 68, 0.7);"></div>
+            <div class="animate-tsunami-ring-2" style="position: absolute; width: 100%; height: 100%; border-radius: 50%; background: ${isTsunami ? 'rgba(220, 38, 38, 0.35)' : 'rgba(244, 63, 94, 0.25)'}; border: 1px dashed rgba(239, 68, 68, 0.5);"></div>
+            <div class="animate-tsunami-ring-3" style="position: absolute; width: 100%; height: 100%; border-radius: 50%; background: ${isTsunami ? 'rgba(185, 28, 28, 0.25)' : 'rgba(244, 63, 94, 0.15)'}; border: 1px solid rgba(239, 68, 68, 0.3);"></div>
+            
+            <!-- Inti Episentrum Merah Menyala -->
+            <div class="marker-tsunami-epicenter" style="position: absolute; width: ${isTsunami ? '38px' : '32px'}; height: ${isTsunami ? '38px' : '32px'}; border-radius: 50%; background: ${isTsunami ? '#DC2626' : '#EF4444'}; border: 3px solid #FFFFFF; display: flex; flex-direction: column; align-items: center; justify-content: center; color: white; font-weight: 900; font-size: 11px; z-index: 10;">
+              <span>M${gempaData.magnitude}</span>
+            </div>
+
+            <!-- Label Teks Melayang Status Bahaya -->
+            <div style="position: absolute; bottom: -28px; white-space: nowrap; background: rgba(15, 23, 32, 0.95); border: 1.5px solid ${isTsunami ? '#EF4444' : '#F43F5E'}; color: ${isTsunami ? '#FCA5A5' : '#FECDD3'}; font-weight: 800; font-size: 10px; padding: 2px 8px; border-radius: 6px; box-shadow: 0 4px 12px rgba(0,0,0,0.6); pointer-events: none; letter-spacing: 0.03em;">
+              ${isTsunami ? '⚠️ POTENSI TSUNAMI' : 'PUSAT GEMPA RIIL'}
             </div>
           </div>
         `;
 
-        const popup = new maplibregl.Popup({ offset: 20, className: 'gis-hover-popup', maxWidth: 'none' }).setHTML(`
-          <div style="font-family: 'Inter', -apple-system, sans-serif; width: 250px; box-sizing: border-box; color: #F8FAFC;">
-            <div style="display: flex; align-items: center; gap: 5px; border-bottom: 1px solid rgba(239,68,68,0.3); padding-bottom: 4px; margin-bottom: 6px;">
-              <span style="font-weight: 800; color: #EF4444; font-size: 11px;">⚠️ GEMPA TERKINI BMKG</span>
+        const popup = new maplibregl.Popup({ offset: 25, className: 'gis-hover-popup', maxWidth: 'none' }).setHTML(`
+          <div style="font-family: 'Inter', -apple-system, sans-serif; width: 280px; box-sizing: border-box; color: #F8FAFC; padding: 4px;">
+            <div style="display: flex; align-items: center; justify-content: space-between; gap: 5px; border-bottom: 1.5px solid rgba(239,68,68,0.4); padding-bottom: 6px; margin-bottom: 8px;">
+              <span style="font-weight: 900; color: #EF4444; font-size: 12px; letter-spacing: 0.04em;">⚠️ BMKG TEWS LIVE SENSOR</span>
+              ${
+                isTsunami
+                  ? `<span style="background: #DC2626; color: #FFFFFF; font-size: 9px; font-weight: 900; padding: 2px 6px; border-radius: 4px; animation: pulse 1s infinite;">TSUNAMI</span>`
+                  : ''
+              }
             </div>
-            <div style="font-weight: 800; font-size: 13.5px; color: #FFFFFF; margin-bottom: 3px;">
-              Magnitudo ${gempaData.magnitude} SR
+            <div style="font-weight: 900; font-size: 15px; color: #FFFFFF; margin-bottom: 4px;">
+              Magnitudo ${gempaData.magnitude} M
             </div>
-            <div style="font-size: 11px; color: #CBD5E1; margin-bottom: 4px; line-height: 1.35;">
+            <div style="font-size: 12.5px; font-weight: 600; color: #E2E8F0; margin-bottom: 6px; line-height: 1.4;">
               ${gempaData.wilayah_teks}
             </div>
-            <div style="font-size: 10px; color: #94A3B8; line-height: 1.4;">
-              Kedalaman: <b style="color: #E2E8F0;">${gempaData.kedalaman_km} km</b><br/>
-              Waktu: <span style="color: #E2E8F0;">${gempaData.waktu_kejadian}</span>
+            <div style="background: rgba(15, 23, 32, 0.6); padding: 6px 8px; border-radius: 6px; font-size: 11px; color: #94A3B8; line-height: 1.5; margin-bottom: 6px;">
+              Kedalaman: <b style="color: #F8FAFC;">${gempaData.kedalaman_km} km</b><br/>
+              Waktu Gempa: <span style="color: #F8FAFC;">${gempaData.waktu_kejadian}</span><br/>
+              Koordinat: <span style="color: #38BDF8; font-family: monospace;">${gempaData.lat.toFixed(3)}°, ${gempaData.lon.toFixed(3)}°</span>
             </div>
             ${
-              gempaData.potensi_tsunami
-                ? `<div style="background: rgba(220,38,38,0.25); color: #FCA5A5; border: 1px solid rgba(220,38,38,0.5); font-size: 9.5px; font-weight: 800; padding: 3px 6px; border-radius: 4px; margin-top: 6px; text-align: center; letter-spacing: 0.05em;">POTENSI TSUNAMI AKTIF</div>`
-                : ''
+              isTsunami
+                ? `<div style="background: rgba(220,38,38,0.3); color: #FCA5A5; border: 1.5px solid #EF4444; font-size: 10.5px; font-weight: 800; padding: 6px 8px; border-radius: 6px; text-align: center; letter-spacing: 0.04em;">
+                    PERINGATAN DINI: BERPOTENSI TSUNAMI!
+                   </div>`
+                : `<div style="background: rgba(16,185,129,0.15); color: #6EE7B7; border: 1px solid rgba(16,185,129,0.3); font-size: 10.5px; font-weight: 700; padding: 4px 6px; border-radius: 6px; text-align: center;">
+                    Tidak Berpotensi Tsunami
+                   </div>`
             }
           </div>
         `);
@@ -1891,21 +2091,104 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
     }
   }, [gempaData]);
 
-  // FlyTo Koordinat Terpilih
+  // FlyTo Koordinat Terpilih (Animasi Halus & Natural dengan Easing Curve)
   useEffect(() => {
     if (!map.current || !flyToCoords) return;
     map.current.flyTo({
       center: [flyToCoords.lng, flyToCoords.lat],
       zoom: flyToCoords.zoom || 11.5,
-      pitch: modeHematDaya ? 0 : 45,
+      pitch: modeHematDaya ? 0 : 35,
       essential: true,
-      duration: 1200,
+      duration: 1800,
+      curve: 1.42,
     });
   }, [flyToCoords, modeHematDaya]);
 
+  // Sinkronisasi Data Peringatan Dini Cuaca Ekstrem Dinamis BMKG ke MapLibre Source
+  useEffect(() => {
+    if (!map.current || !mapLoaded) return;
+    const src = map.current.getSource('cuaca-zone-src') as maplibregl.GeoJSONSource;
+    if (src) {
+      src.setData(dynamicCuacaGeoJSON as any);
+    }
+  }, [dynamicCuacaGeoJSON, mapLoaded]);
+
   return (
     <div className="relative w-full h-full bg-[#0F1720]">
-      <div ref={mapContainer} className="w-full h-full" id="maplibre-container" />
+      <div 
+        ref={mapContainer} 
+        className="w-full h-full outline-none focus:ring-1 focus:ring-emerald-500/50" 
+        id="maplibre-container"
+        role="region"
+        aria-label="Peta Interaktif Geospasial Kebencanaan Sumatera Barat"
+        tabIndex={0}
+        onKeyDown={(e) => {
+          if (!map.current) return;
+          const panStep = 80;
+          switch (e.key) {
+            case 'ArrowUp':
+              e.preventDefault();
+              map.current.panBy([0, -panStep]);
+              break;
+            case 'ArrowDown':
+              e.preventDefault();
+              map.current.panBy([0, panStep]);
+              break;
+            case 'ArrowLeft':
+              e.preventDefault();
+              map.current.panBy([-panStep, 0]);
+              break;
+            case 'ArrowRight':
+              e.preventDefault();
+              map.current.panBy([panStep, 0]);
+              break;
+            case '+':
+            case '=':
+              e.preventDefault();
+              map.current.zoomIn();
+              break;
+            case '-':
+            case '_':
+              e.preventDefault();
+              map.current.zoomOut();
+              break;
+            case 'r':
+            case 'R':
+              e.preventDefault();
+              map.current.resetNorthPitch({ duration: 600 });
+              break;
+          }
+        }}
+      />
+
+      {/* Kolom Kontrol Navigasi Sisi Kanan Ergonomis (Standar ISO/OGC & Triad Lens) */}
+      {onStyleChange && (
+        <RightMapControlDock
+          currentStyle={styleVariant}
+          onStyleChange={onStyleChange}
+          is3DTerrain={is3DTerrain}
+          onToggle3D={onToggle3D}
+          onZoomIn={() => map.current?.zoomIn()}
+          onZoomOut={() => map.current?.zoomOut()}
+          onResetNorth={() => map.current?.resetNorthPitch({ duration: 800 })}
+          onLocateMe={() => {
+            if (navigator.geolocation) {
+              navigator.geolocation.getCurrentPosition(
+                (pos) => {
+                  map.current?.flyTo({
+                    center: [pos.coords.longitude, pos.coords.latitude],
+                    zoom: 14,
+                    essential: true,
+                  });
+                },
+                (err) => console.warn('Geolocation sensor warning:', err.message),
+                { enableHighAccuracy: true, timeout: 8000 }
+              );
+            }
+          }}
+          bearing={mapBearing}
+        />
+      )}
 
       {/* Floating Follower Tooltip saat Mode Penentuan Titik Aktif */}
       {isPickingLocation && mousePos && (

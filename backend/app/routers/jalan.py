@@ -276,13 +276,18 @@ async def pulihkan_jalan(
 async def delete_jalan_terputus(
     jalan_id: int,
     request: Request,
-    current_user: Pengguna = Depends(require_role(["operator", "admin"])),
+    current_user: Pengguna = Depends(require_role(["admin", "super_admin"])),
     db: AsyncSession = Depends(get_async_db)
 ):
     """
-    Operator & Admin: Menghapus catatan ruas jalan terputus.
+    Khusus Admin & Super Admin: Mengarsipkan ruas jalan terputus (Soft-Delete menjadi status pulih).
     """
-    query = text("DELETE FROM jalan_terputus WHERE id = :id RETURNING id, alasan;")
+    query = text("""
+        UPDATE jalan_terputus 
+        SET status = 'pulih', tanggal_pulih = now() 
+        WHERE id = :id 
+        RETURNING id, alasan, status;
+    """)
     res = await db.execute(query, {"id": jalan_id})
     row = res.fetchone()
     if not row:
@@ -295,16 +300,18 @@ async def delete_jalan_terputus(
     await record_audit(
         db=db,
         pengguna_id=current_user.id,
-        aksi="DELETE_JALAN_TERPUTUS",
+        aksi="SOFT_DELETE_JALAN_TERPUTUS",
         tabel_target="jalan_terputus",
         record_id=jalan_id,
-        detail={"alasan": row.alasan},
+        detail={"alasan": row.alasan, "action": "set_status_pulih"},
         ip_address=client_ip
     )
 
     await db.commit()
+
     return {
-        "message": f"Ruas jalan ID {jalan_id} berhasil dihapus dari sistem.",
-        "id": row.id
+        "message": f"Ruas jalan ID {jalan_id} berhasil diarsipkan & dinyatakan pulih dari rintangan bencana.",
+        "id": row.id,
+        "status": row.status
     }
 

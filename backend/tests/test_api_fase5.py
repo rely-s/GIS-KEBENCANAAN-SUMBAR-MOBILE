@@ -1,5 +1,6 @@
 import pytest
 import httpx
+from app.main import app
 
 @pytest.mark.asyncio
 async def test_posko_features(client: httpx.AsyncClient):
@@ -31,14 +32,20 @@ async def test_sirine_tsunami_network(client: httpx.AsyncClient):
     assert len(sirine_features) >= 40
 
 @pytest.mark.asyncio
-async def test_automated_sitrep_generator(client: httpx.AsyncClient):
-    """Test automated SITREP BNPB and WhatsApp digest formatting."""
-    res = await client.get("/api/admin/sitrep")
-    assert res.status_code == 200
-    sitrep = res.json()
-    kpi = sitrep.get("kpi", {})
-    assert kpi.get("total_pengungsi", 0) > 0
-    assert "LAPORAN SITUASI KEBENCANAAN" in sitrep.get("whatsapp_formatted", "")
+async def test_automated_sitrep_generator(admin_headers: dict):
+    """Test automated SITREP BNPB and WhatsApp digest formatting with role auth."""
+    # 1. Klien anonim tanpa cookie/token harus ditolak 401 Unauthorized
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as anon_client:
+        res_unauth = await anon_client.get("/api/admin/sitrep")
+        assert res_unauth.status_code == 401
+
+        # 2. Akses dengan token otorisasi admin/pimpinan berhasil 200 OK
+        res = await anon_client.get("/api/admin/sitrep", headers=admin_headers)
+        assert res.status_code == 200
+        sitrep = res.json()
+        kpi = sitrep.get("kpi", {})
+        assert kpi.get("total_pengungsi", 0) > 0
+        assert "LAPORAN SITUASI KEBENCANAAN" in sitrep.get("whatsapp_formatted", "")
 
 @pytest.mark.asyncio
 async def test_bmkg_weather_alerts(client: httpx.AsyncClient):

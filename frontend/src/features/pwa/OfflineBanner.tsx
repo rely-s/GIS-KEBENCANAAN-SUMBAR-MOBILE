@@ -8,23 +8,20 @@ interface OfflineBannerProps {
 export const OfflineBanner: React.FC<OfflineBannerProps> = ({ lastUpdated }) => {
   const [isOnline, setIsOnline] = useState<boolean>(navigator.onLine);
   const [showReconnectedToast, setShowReconnectedToast] = useState<boolean>(false);
-  const [lastSyncTime, setLastSyncTime] = useState<string>(() => {
+  const [internalSyncTime, setInternalSyncTime] = useState<string>(() => {
     const now = new Date();
     return `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')} WIB`;
   });
+  const displaySyncTime = lastUpdated || internalSyncTime;
 
-  useEffect(() => {
-    if (lastUpdated) {
-      setLastSyncTime(lastUpdated);
-    }
-  }, [lastUpdated]);
 
   useEffect(() => {
     const handleOnline = () => {
       setIsOnline(true);
       setShowReconnectedToast(true);
       const now = new Date();
-      setLastSyncTime(`${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')} WIB`);
+      setInternalSyncTime(`${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')} WIB`);
+
 
       const timer = setTimeout(() => {
         setShowReconnectedToast(false);
@@ -80,8 +77,9 @@ export const OfflineBanner: React.FC<OfflineBannerProps> = ({ lastUpdated }) => 
           Mode Offline Tanggap Darurat
         </div>
         <div className="text-xs text-slate-300">
-          Menggunakan data cache lokal — data terakhir diperbarui pukul <strong className="text-white font-mono">{lastSyncTime}</strong>
+          Menggunakan data cache lokal — data terakhir diperbarui pukul <strong className="text-white font-mono">{displaySyncTime}</strong>
         </div>
+
       </div>
     </div>
   );

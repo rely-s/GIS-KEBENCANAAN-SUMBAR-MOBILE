@@ -12,6 +12,8 @@ from app.models.bencana import KejadianBencana, DataDampakBencana
 from app.models.wilayah import WilayahAdministratif
 from app.models.pengguna import Pengguna
 from app.services.audit_service import record_audit
+from app.services.storage_service import save_base64_image
+from app.routers.events import broadcaster
 
 router = APIRouter(prefix="/bencana", tags=["Data Kejadian Bencana"])
 
@@ -39,6 +41,8 @@ class BencanaCreateRequest(BaseModel):
     deskripsi: Optional[str] = None
     sumber_data: Optional[str] = "operator_bpbd"
     status_verifikasi: Optional[str] = "terverifikasi"
+    foto_url: Optional[str] = None
+    foto_base64: Optional[str] = None
     dampak: Optional[DampakInputRequest] = None
 
 class BencanaUpdateRequest(BaseModel):
@@ -48,12 +52,23 @@ class BencanaUpdateRequest(BaseModel):
     lat: Optional[float] = None
     lon: Optional[float] = None
     deskripsi: Optional[str] = None
+    foto_url: Optional[str] = None
+    foto_base64: Optional[str] = None
     sumber_data: Optional[str] = None
     status_verifikasi: Optional[str] = None
 
 class BencanaVerifikasiRequest(BaseModel):
     status_verifikasi: str = Field(..., description="terverifikasi | ditolak | menunggu")
     catatan: Optional[str] = None
+
+class LaporWargaRequest(BaseModel):
+    jenis_bencana: str = Field(..., description="gempa | tsunami | banjir | longsor | erupsi | angin_puting_beliung | kebakaran | lainnya")
+    lat: float = Field(..., ge=-10.0, le=10.0, description="Latitude lokasi kejadian (WGS84)")
+    lon: float = Field(..., ge=90.0, le=145.0, description="Longitude lokasi kejadian (WGS84)")
+    deskripsi: str = Field(..., min_length=5, max_length=1500, description="Keterangan kondisi darurat lapangan")
+    nama_pelapor: Optional[str] = Field(default="Warga Lapangan", max_length=100)
+    kontak_pelapor: Optional[str] = Field(default=None, max_length=30)
+    foto_base64: Optional[str] = Field(default=None, description="Foto bukti visual (WebP/JPEG terkompresi)")
 
 @router.get("")
 async def list_bencana(
@@ -336,6 +351,106 @@ async def detail_bencana(
 # ENDPOINTS MUTASI (CREATE, UPDATE, VERIFIKASI, DELETE)
 # ============================================================================
 
+@router.post("/lapor-warga", status_code=status.HTTP_201_CREATED)
+async def lapor_bencana_warga(
+    payload: LaporWargaRequest,
+    request: Request,
+    db: AsyncSession = Depends(get_async_db)
+):
+    """
+    Endpoint Partisipatif Publik (Crowdsourcing Warga):
+    Melaporkan kondisi darurat bencana langsung dari ponsel warga.
+    Laporan otomatis masuk antrean verifikasi supervisor Pusdalops.
+    """
+    valid_jenis = ['gempa', 'tsunami', 'banjir', 'longsor', 'erupsi', 'angin_puting_beliung', 'kebakaran', 'lainnya']
+    if payload.jenis_bencana not in valid_jenis:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail={"error": {"code": "INVALID_JENIS", "message": f"Jenis bencana harus salah satu dari: {', '.join(valid_jenis)}"}}
+        )
+
+    # Validasi Bounding Box Spasial Sumatera Barat (Lat: -3.5 s/d 0.9, Lon: 98.5 s/d 101.9)
+    if not (-3.5 <= payload.lat <= 0.9 and 98.5 <= payload.lon <= 101.9):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail={"error": {"code": "OUT_OF_BOUNDS", "message": "Koordinat lokasi pelaporan berada di luar batas wilayah Provinsi Sumatera Barat."}}
+        )
+
+    # Cari wilayah administratif terdekat via PostGIS
+    wilayah_query = text("""
+        SELECT id, nama FROM wilayah_administratif
+        ORDER BY ST_Distance(geom, ST_SetSRID(ST_MakePoint(:lon, :lat), 4326)) ASC
+        LIMIT 1;
+    """)
+    wilayah_row = (await db.execute(wilayah_query, {"lon": payload.lon, "lat": payload.lat})).fetchone()
+    wilayah_id = wilayah_row.id if wilayah_row else None
+    wilayah_nama = wilayah_row.nama if wilayah_row else "Sumatera Barat"
+
+    clean_pelapor = payload.nama_pelapor.strip() if payload.nama_pelapor else "Warga Lapangan"
+    clean_kontak = payload.kontak_pelapor.strip() if payload.kontak_pelapor else "Tanpa Nomor Kontak"
+    laporan_deskripsi = f"[Laporan Warga: {clean_pelapor} | Kontak: {clean_kontak}] {payload.deskripsi}"
+
+    # Simpan bukti visual foto jika disertakan
+    foto_url = None
+    if payload.foto_base64:
+        foto_url = save_base64_image(payload.foto_base64, subfolder="laporan")
+
+    sql_kejadian = text("""
+        INSERT INTO kejadian_bencana (
+            jenis_bencana, tanggal_kejadian, wilayah_id, lokasi, deskripsi, foto_url, sumber_data, status_verifikasi, dibuat_oleh, created_at, updated_at
+        ) VALUES (
+            :jenis, now(), :wilayah_id, ST_SetSRID(ST_MakePoint(:lon, :lat), 4326), :deskripsi, :foto_url, 'laporan_warga', 'menunggu', NULL, now(), now()
+        ) RETURNING id, jenis_bencana, status_verifikasi, foto_url, created_at;
+    """)
+
+    res = await db.execute(sql_kejadian, {
+        "jenis": payload.jenis_bencana,
+        "wilayah_id": wilayah_id,
+        "lon": payload.lon,
+        "lat": payload.lat,
+        "deskripsi": laporan_deskripsi,
+        "foto_url": foto_url
+    })
+    row = res.fetchone()
+
+    # Catat jejak audit crowdsourcing
+    client_ip = request.client.host if request.client else None
+    await record_audit(
+        db=db,
+        pengguna_id=None,
+        aksi="LAPOR_WARGA_CROWDSOURCE",
+        tabel_target="kejadian_bencana",
+        record_id=row.id,
+        detail={"jenis": payload.jenis_bencana, "pelapor": clean_pelapor, "lat": payload.lat, "lon": payload.lon, "foto_terlampir": bool(foto_url)},
+        ip_address=client_ip
+    )
+
+    await db.commit()
+
+    # Siarkan notifikasi darurat secara real-time ke dashboard Pusdalops
+    await broadcaster.broadcast("laporan_baru", {
+        "id": row.id,
+        "ticket_id": f"LAPOR-SUMBAR-{row.id}",
+        "jenis_bencana": payload.jenis_bencana,
+        "wilayah": wilayah_nama,
+        "lat": payload.lat,
+        "lon": payload.lon,
+        "deskripsi": laporan_deskripsi,
+        "foto_url": row.foto_url,
+        "status_verifikasi": "menunggu",
+        "created_at": datetime.utcnow().isoformat()
+    })
+
+    return {
+        "status": "success",
+        "ticket_id": f"LAPOR-SUMBAR-{row.id}",
+        "bencana_id": row.id,
+        "foto_url": row.foto_url,
+        "message": "Terima kasih atas kepedulian Anda. Laporan situasi dan bukti foto telah diterima Pusdalops BPBD Sumbar dan segera diverifikasi petugas.",
+        "wilayah_terdeteksi": wilayah_nama,
+        "estimasi_tindakan": "Petugas TRC terdekat segera mengonfirmasi titik koordinat."
+    }
+
 @router.post("", status_code=status.HTTP_201_CREATED)
 async def create_bencana(
     payload: BencanaCreateRequest,
@@ -353,25 +468,53 @@ async def create_bencana(
             detail={"error": {"code": "INVALID_JENIS", "message": f"Jenis bencana harus salah satu dari: {', '.join(valid_jenis)}"}}
         )
 
+    # Validasi Anti-BOLA / IDOR dan Penegakan Status Verifikasi Operator
+    target_wilayah_id = payload.wilayah_id
+    if current_user.role == "operator":
+        # Operator lapangan selalu masuk antrean 'menunggu' untuk diverifikasi supervisor Pusdalops
+        status_verifikasi = "menunggu"
+        sumber_data = f"operator_lapangan_{current_user.nama}"
+        if current_user.wilayah_tugas_id is not None:
+            if target_wilayah_id is not None and target_wilayah_id != current_user.wilayah_tugas_id:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail={
+                        "error": {
+                            "code": "FORBIDDEN_WILAYAH",
+                            "message": "Akses ditolak: Anda hanya berwenang melaporkan bencana di wilayah tugas Anda."
+                        }
+                    }
+                )
+            target_wilayah_id = current_user.wilayah_tugas_id
+    else:
+        status_verifikasi = payload.status_verifikasi or "terverifikasi"
+        sumber_data = payload.sumber_data or "pusdalops_bpbd"
+
+    # Proses foto bukti jika ada
+    foto_url = payload.foto_url
+    if payload.foto_base64:
+        foto_url = save_base64_image(payload.foto_base64, subfolder="laporan")
+
     # Simpan Kejadian
     geom_sql = "ST_SetSRID(ST_MakePoint(:lon, :lat), 4326)" if (payload.lat is not None and payload.lon is not None) else "NULL"
     tgl = payload.tanggal_kejadian or datetime.utcnow()
 
     sql_kejadian = text(f"""
         INSERT INTO kejadian_bencana (
-            jenis_bencana, tanggal_kejadian, wilayah_id, lokasi, deskripsi, sumber_data, status_verifikasi, dibuat_oleh, created_at, updated_at
+            jenis_bencana, tanggal_kejadian, wilayah_id, lokasi, deskripsi, foto_url, sumber_data, status_verifikasi, dibuat_oleh, created_at, updated_at
         ) VALUES (
-            :jenis, :tgl, :wilayah_id, {geom_sql}, :deskripsi, :sumber, :verif, :dibuat_oleh, now(), now()
-        ) RETURNING id, jenis_bencana, tanggal_kejadian, status_verifikasi;
+            :jenis, :tgl, :wilayah_id, {geom_sql}, :deskripsi, :foto_url, :sumber, :verif, :dibuat_oleh, now(), now()
+        ) RETURNING id, jenis_bencana, tanggal_kejadian, status_verifikasi, foto_url;
     """)
 
     params: Dict[str, Any] = {
         "jenis": payload.jenis_bencana,
         "tgl": tgl,
-        "wilayah_id": payload.wilayah_id,
+        "wilayah_id": target_wilayah_id,
         "deskripsi": payload.deskripsi,
-        "sumber": payload.sumber_data or "operator_bpbd",
-        "verif": payload.status_verifikasi or "menunggu",
+        "foto_url": foto_url,
+        "sumber": sumber_data,
+        "verif": status_verifikasi,
         "dibuat_oleh": current_user.id
     }
     if payload.lat is not None and payload.lon is not None:
@@ -382,8 +525,9 @@ async def create_bencana(
     row_kejadian = res_kejadian.fetchone()
 
     # Simpan Data Dampak Awal jika disertakan
-    if payload.dampak and payload.wilayah_id:
+    if payload.dampak:
         d = payload.dampak
+        eff_wilayah_id = target_wilayah_id or payload.wilayah_id or 1
         sql_dampak = text("""
             INSERT INTO data_dampak_bencana (
                 kejadian_id, wilayah_id, korban_meninggal, korban_hilang, korban_luka,
@@ -398,7 +542,7 @@ async def create_bencana(
         """)
         await db.execute(sql_dampak, {
             "kejadian_id": row_kejadian.id,
-            "wilayah_id": payload.wilayah_id,
+            "wilayah_id": eff_wilayah_id,
             "meninggal": d.korban_meninggal or 0,
             "hilang": d.korban_hilang or 0,
             "luka": d.korban_luka or 0,
@@ -428,6 +572,13 @@ async def create_bencana(
 
     await db.commit()
 
+    await broadcaster.broadcast("bencana_baru", {
+        "id": row_kejadian.id,
+        "jenis_bencana": row_kejadian.jenis_bencana,
+        "status_verifikasi": row_kejadian.status_verifikasi,
+        "created_by": current_user.nama
+    })
+
     return {
         "message": f"Kejadian bencana '{row_kejadian.jenis_bencana}' berhasil dicatat (ID: {row_kejadian.id}).",
         "id": row_kejadian.id,
@@ -446,13 +597,27 @@ async def update_bencana(
     """
     Operator & Admin: Memperbarui data umum kejadian bencana.
     """
-    check_query = text("SELECT id, jenis_bencana FROM kejadian_bencana WHERE id = :id;")
+    # Verifikasi eksistensi bencana dan validasi anti-BOLA wilayah
+    check_query = text("SELECT id, jenis_bencana, wilayah_id FROM kejadian_bencana WHERE id = :id;")
     existing = (await db.execute(check_query, {"id": bencana_id})).fetchone()
     if not existing:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail={"error": {"code": "NOT_FOUND", "message": f"Bencana dengan ID {bencana_id} tidak ditemukan."}}
         )
+
+    # Operator daerah hanya boleh edit bencana di wilayah tugasnya dan tidak boleh self-verify
+    if current_user.role == "operator":
+        if current_user.wilayah_tugas_id is not None and existing.wilayah_id is not None and existing.wilayah_id != current_user.wilayah_tugas_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail={"error": {"code": "FORBIDDEN_WILAYAH", "message": "Akses ditolak: Anda hanya berwenang memperbarui bencana di wilayah tugas Anda."}}
+            )
+        if payload.status_verifikasi is not None and payload.status_verifikasi != "menunggu":
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail={"error": {"code": "FORBIDDEN_VERIFIKASI", "message": "Akses ditolak: Status verifikasi hanya dapat disahkan oleh supervisor Pusdalops atau Pimpinan."}}
+            )
 
     updates = ["updated_at = now()"]
     params: Dict[str, Any] = {"id": bencana_id}
@@ -475,6 +640,14 @@ async def update_bencana(
     if payload.status_verifikasi is not None:
         updates.append("status_verifikasi = :status_verifikasi")
         params["status_verifikasi"] = payload.status_verifikasi
+    if payload.foto_base64:
+        new_foto = save_base64_image(payload.foto_base64, subfolder="laporan")
+        if new_foto:
+            updates.append("foto_url = :foto_url")
+            params["foto_url"] = new_foto
+    elif payload.foto_url is not None:
+        updates.append("foto_url = :foto_url")
+        params["foto_url"] = payload.foto_url
     if payload.lat is not None and payload.lon is not None:
         updates.append("lokasi = ST_SetSRID(ST_MakePoint(:lon, :lat), 4326)")
         params["lat"] = payload.lat
@@ -677,6 +850,14 @@ async def verifikasi_bencana(
 
     await db.commit()
 
+    await broadcaster.broadcast("laporan_diverifikasi", {
+        "id": row.id,
+        "jenis_bencana": row.jenis_bencana,
+        "status_verifikasi": row.status_verifikasi,
+        "verified_by": current_user.nama,
+        "catatan": payload.catatan
+    })
+
     return {
         "message": f"Status verifikasi kejadian ID {bencana_id} diubah menjadi '{row.status_verifikasi}'.",
         "id": row.id,
@@ -687,11 +868,11 @@ async def verifikasi_bencana(
 async def delete_bencana(
     bencana_id: int,
     request: Request,
-    current_user: Pengguna = Depends(require_role(["admin"])),
+    current_user: Pengguna = Depends(require_role(["admin", "super_admin"])),
     db: AsyncSession = Depends(get_async_db)
 ):
     """
-    Khusus Admin: Menghapus kejadian bencana dan data dampaknya dari sistem.
+    Khusus Admin & Super Admin: Menghapus kejadian bencana dan data dampaknya dari sistem.
     """
     query = text("DELETE FROM kejadian_bencana WHERE id = :id RETURNING id, jenis_bencana;")
     res = await db.execute(query, {"id": bencana_id})

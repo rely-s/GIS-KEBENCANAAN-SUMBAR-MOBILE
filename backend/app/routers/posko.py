@@ -30,6 +30,16 @@ class PoskoCreateRequest(BaseModel):
     kontak_telepon: Optional[str] = Field(default=None, max_length=30, description="Nomor telepon darurat PIC")
     status: Optional[str] = Field(default="aktif", description="aktif | penuh | nonaktif")
     wilayah_id: Optional[int] = Field(default=None, description="ID wilayah administratif")
+    
+    # Standar Kemanusiaan & Pilah Kelompok Rentan BNPB
+    jumlah_pengungsi_pria: Optional[int] = Field(default=0, ge=0)
+    jumlah_pengungsi_wanita: Optional[int] = Field(default=0, ge=0)
+    jumlah_pengungsi_lansia: Optional[int] = Field(default=0, ge=0)
+    jumlah_pengungsi_balita: Optional[int] = Field(default=0, ge=0)
+    jumlah_pengungsi_disabilitas: Optional[int] = Field(default=0, ge=0)
+    ketersediaan_air_bersih: Optional[str] = Field(default="YA")
+    ketersediaan_dapur_umum: Optional[str] = Field(default="TIDAK")
+    ketersediaan_tenaga_medis: Optional[str] = Field(default="TIDAK")
 
 class PoskoUpdateRequest(BaseModel):
     nama: Optional[str] = Field(None, max_length=150)
@@ -42,6 +52,14 @@ class PoskoUpdateRequest(BaseModel):
     kontak_telepon: Optional[str] = None
     status: Optional[str] = None
     wilayah_id: Optional[int] = None
+    jumlah_pengungsi_pria: Optional[int] = Field(None, ge=0)
+    jumlah_pengungsi_wanita: Optional[int] = Field(None, ge=0)
+    jumlah_pengungsi_lansia: Optional[int] = Field(None, ge=0)
+    jumlah_pengungsi_balita: Optional[int] = Field(None, ge=0)
+    jumlah_pengungsi_disabilitas: Optional[int] = Field(None, ge=0)
+    ketersediaan_air_bersih: Optional[str] = None
+    ketersediaan_dapur_umum: Optional[str] = None
+    ketersediaan_tenaga_medis: Optional[str] = None
 
 class PoskoStatusRequest(BaseModel):
     status: str = Field(..., description="Status: aktif | penuh | nonaktif")
@@ -86,6 +104,8 @@ async def list_semua_posko(
     query = text(f"""
         SELECT 
             id, nama, jenis, kapasitas, fasilitas, kontak_pic, kontak_telepon, status, wilayah_id, id_kecamatan,
+            jumlah_pengungsi_pria, jumlah_pengungsi_wanita, jumlah_pengungsi_lansia, jumlah_pengungsi_balita, jumlah_pengungsi_disabilitas,
+            ketersediaan_air_bersih, ketersediaan_dapur_umum, ketersediaan_tenaga_medis,
             ST_X(lokasi) AS lon, ST_Y(lokasi) AS lat, updated_at
         FROM posko_evakuasi
         {where_clause}
@@ -113,6 +133,14 @@ async def list_semua_posko(
                 "status": r.status,
                 "wilayah_id": r.wilayah_id,
                 "id_kecamatan": r.id_kecamatan,
+                "jumlah_pengungsi_pria": r.jumlah_pengungsi_pria or 0,
+                "jumlah_pengungsi_wanita": r.jumlah_pengungsi_wanita or 0,
+                "jumlah_pengungsi_lansia": r.jumlah_pengungsi_lansia or 0,
+                "jumlah_pengungsi_balita": r.jumlah_pengungsi_balita or 0,
+                "jumlah_pengungsi_disabilitas": r.jumlah_pengungsi_disabilitas or 0,
+                "ketersediaan_air_bersih": r.ketersediaan_air_bersih or "YA",
+                "ketersediaan_dapur_umum": r.ketersediaan_dapur_umum or "TIDAK",
+                "ketersediaan_tenaga_medis": r.ketersediaan_tenaga_medis or "TIDAK",
                 "updated_at": r.updated_at.isoformat() if r.updated_at else None
             }
         })
@@ -121,6 +149,21 @@ async def list_semua_posko(
         "type": "FeatureCollection",
         "features": features
     }
+
+@router.get("/geojson")
+async def list_posko_geojson(
+    jenis: Optional[str] = None,
+    include_nonaktif: bool = False,
+    wilayah_id: Optional[int] = None,
+    id_kecamatan: Optional[str] = None,
+    search: Optional[str] = None,
+    db: AsyncSession = Depends(get_async_db)
+):
+    """
+    Endpoint Khusus MapLibre GL JS: Menyajikan GeoJSON FeatureCollection titik posko & shelter
+    lengkap dengan atribut kapasitas untuk clustering terakselerasi GPU.
+    """
+    return await list_semua_posko(jenis, include_nonaktif, wilayah_id, id_kecamatan, search, db)
 
 @router.get("/nearest")
 async def nearest_posko_endpoint(
@@ -189,6 +232,9 @@ async def detail_posko(
         SELECT 
             p.id, p.nama, p.jenis, p.kapasitas, p.fasilitas, p.kontak_pic, p.kontak_telepon, p.status,
             p.wilayah_id, w.nama AS wilayah_nama,
+            p.jumlah_pengungsi_pria, p.jumlah_pengungsi_wanita, p.jumlah_pengungsi_lansia,
+            p.jumlah_pengungsi_balita, p.jumlah_pengungsi_disabilitas,
+            p.ketersediaan_air_bersih, p.ketersediaan_dapur_umum, p.ketersediaan_tenaga_medis,
             ST_X(p.lokasi) AS lon, ST_Y(p.lokasi) AS lat, p.created_at, p.updated_at
         FROM posko_evakuasi p
         LEFT JOIN wilayah_administratif w ON w.id = p.wilayah_id
@@ -214,6 +260,14 @@ async def detail_posko(
         "status": row.status,
         "wilayah_id": row.wilayah_id,
         "wilayah_nama": row.wilayah_nama,
+        "jumlah_pengungsi_pria": row.jumlah_pengungsi_pria or 0,
+        "jumlah_pengungsi_wanita": row.jumlah_pengungsi_wanita or 0,
+        "jumlah_pengungsi_lansia": row.jumlah_pengungsi_lansia or 0,
+        "jumlah_pengungsi_balita": row.jumlah_pengungsi_balita or 0,
+        "jumlah_pengungsi_disabilitas": row.jumlah_pengungsi_disabilitas or 0,
+        "ketersediaan_air_bersih": row.ketersediaan_air_bersih or "YA",
+        "ketersediaan_dapur_umum": row.ketersediaan_dapur_umum or "TIDAK",
+        "ketersediaan_tenaga_medis": row.ketersediaan_tenaga_medis or "TIDAK",
         "lat": float(row.lat),
         "lon": float(row.lon),
         "created_at": row.created_at.isoformat() if row.created_at else None,
@@ -250,10 +304,16 @@ async def create_posko(
 
     query = text("""
         INSERT INTO posko_evakuasi (
-            nama, jenis, lokasi, kapasitas, fasilitas, kontak_pic, kontak_telepon, status, wilayah_id, created_at, updated_at
+            nama, jenis, lokasi, kapasitas, fasilitas, kontak_pic, kontak_telepon, status, wilayah_id,
+            jumlah_pengungsi_pria, jumlah_pengungsi_wanita, jumlah_pengungsi_lansia, jumlah_pengungsi_balita, jumlah_pengungsi_disabilitas,
+            ketersediaan_air_bersih, ketersediaan_dapur_umum, ketersediaan_tenaga_medis,
+            created_at, updated_at
         ) VALUES (
             :nama, :jenis, ST_SetSRID(ST_MakePoint(:lon, :lat), 4326),
-            :kapasitas, :fasilitas, :kontak_pic, :kontak_telepon, :status, :wilayah_id, now(), now()
+            :kapasitas, :fasilitas, :kontak_pic, :kontak_telepon, :status, :wilayah_id,
+            :pria, :wanita, :lansia, :balita, :disabilitas,
+            :air_bersih, :dapur_umum, :tenaga_medis,
+            now(), now()
         ) RETURNING id, nama, jenis, status;
     """)
 
@@ -267,7 +327,15 @@ async def create_posko(
         "kontak_pic": payload.kontak_pic,
         "kontak_telepon": payload.kontak_telepon,
         "status": payload.status,
-        "wilayah_id": payload.wilayah_id
+        "wilayah_id": payload.wilayah_id,
+        "pria": payload.jumlah_pengungsi_pria or 0,
+        "wanita": payload.jumlah_pengungsi_wanita or 0,
+        "lansia": payload.jumlah_pengungsi_lansia or 0,
+        "balita": payload.jumlah_pengungsi_balita or 0,
+        "disabilitas": payload.jumlah_pengungsi_disabilitas or 0,
+        "air_bersih": payload.ketersediaan_air_bersih or "YA",
+        "dapur_umum": payload.ketersediaan_dapur_umum or "TIDAK",
+        "tenaga_medis": payload.ketersediaan_tenaga_medis or "TIDAK"
     })
     row = result.fetchone()
 
@@ -304,14 +372,27 @@ async def update_posko(
     """
     Operator & Admin: Memperbarui data detail posko evakuasi / shelter.
     """
-    # Verifikasi eksistensi posko
-    check_query = text("SELECT id, nama FROM posko_evakuasi WHERE id = :id;")
+    # Verifikasi eksistensi posko dan validasi anti-BOLA wilayah
+    check_query = text("SELECT id, nama, wilayah_id FROM posko_evakuasi WHERE id = :id;")
     existing = (await db.execute(check_query, {"id": posko_id})).fetchone()
     if not existing:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail={"error": {"code": "NOT_FOUND", "message": f"Posko dengan ID {posko_id} tidak ditemukan."}}
         )
+
+    # Validasi Anti-BOLA / IDOR untuk operator daerah
+    if current_user.role == "operator" and current_user.wilayah_tugas_id is not None:
+        if existing.wilayah_id is not None and existing.wilayah_id != current_user.wilayah_tugas_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail={
+                    "error": {
+                        "code": "FORBIDDEN_WILAYAH",
+                        "message": "Akses ditolak: Anda hanya berwenang memperbarui data posko di wilayah tugas Anda."
+                    }
+                }
+            )
 
     updates = ["updated_at = now()"]
     params: Dict[str, Any] = {"id": posko_id}
@@ -340,6 +421,30 @@ async def update_posko(
     if payload.wilayah_id is not None:
         updates.append("wilayah_id = :wilayah_id")
         params["wilayah_id"] = payload.wilayah_id
+    if payload.jumlah_pengungsi_pria is not None:
+        updates.append("jumlah_pengungsi_pria = :pria")
+        params["pria"] = payload.jumlah_pengungsi_pria
+    if payload.jumlah_pengungsi_wanita is not None:
+        updates.append("jumlah_pengungsi_wanita = :wanita")
+        params["wanita"] = payload.jumlah_pengungsi_wanita
+    if payload.jumlah_pengungsi_lansia is not None:
+        updates.append("jumlah_pengungsi_lansia = :lansia")
+        params["lansia"] = payload.jumlah_pengungsi_lansia
+    if payload.jumlah_pengungsi_balita is not None:
+        updates.append("jumlah_pengungsi_balita = :balita")
+        params["balita"] = payload.jumlah_pengungsi_balita
+    if payload.jumlah_pengungsi_disabilitas is not None:
+        updates.append("jumlah_pengungsi_disabilitas = :disabilitas")
+        params["disabilitas"] = payload.jumlah_pengungsi_disabilitas
+    if payload.ketersediaan_air_bersih is not None:
+        updates.append("ketersediaan_air_bersih = :air_bersih")
+        params["air_bersih"] = payload.ketersediaan_air_bersih
+    if payload.ketersediaan_dapur_umum is not None:
+        updates.append("ketersediaan_dapur_umum = :dapur_umum")
+        params["dapur_umum"] = payload.ketersediaan_dapur_umum
+    if payload.ketersediaan_tenaga_medis is not None:
+        updates.append("ketersediaan_tenaga_medis = :tenaga_medis")
+        params["tenaga_medis"] = payload.ketersediaan_tenaga_medis
     if payload.lat is not None and payload.lon is not None:
         updates.append("lokasi = ST_SetSRID(ST_MakePoint(:lon, :lat), 4326)")
         params["lat"] = payload.lat
@@ -394,6 +499,27 @@ async def update_posko_status(
             detail={"error": {"code": "INVALID_STATUS", "message": "Status harus salah satu dari: aktif, penuh, nonaktif"}}
         )
 
+    # Validasi Anti-BOLA / IDOR wilayah
+    check_query = text("SELECT id, nama, wilayah_id FROM posko_evakuasi WHERE id = :id;")
+    existing = (await db.execute(check_query, {"id": posko_id})).fetchone()
+    if not existing:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={"error": {"code": "NOT_FOUND", "message": f"Posko dengan ID {posko_id} tidak ditemukan."}}
+        )
+
+    if current_user.role == "operator" and current_user.wilayah_tugas_id is not None:
+        if existing.wilayah_id is not None and existing.wilayah_id != current_user.wilayah_tugas_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail={
+                    "error": {
+                        "code": "FORBIDDEN_WILAYAH",
+                        "message": "Akses ditolak: Anda hanya berwenang memperbarui status posko di wilayah tugas Anda."
+                    }
+                }
+            )
+
     query = text("""
         UPDATE posko_evakuasi
         SET status = :status,
@@ -408,11 +534,6 @@ async def update_posko_status(
         "posko_id": posko_id
     })
     row = res.fetchone()
-    if not row:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail={"error": {"code": "NOT_FOUND", "message": f"Posko dengan ID {posko_id} tidak ditemukan."}}
-        )
 
     # Catat Audit Log
     client_ip = request.client.host if request.client else None
@@ -438,13 +559,19 @@ async def update_posko_status(
 async def delete_posko(
     posko_id: int,
     request: Request,
-    current_user: Pengguna = Depends(require_role(["operator", "admin"])),
+    current_user: Pengguna = Depends(require_role(["admin", "super_admin"])),
     db: AsyncSession = Depends(get_async_db)
 ):
     """
-    Operator & Admin: Menghapus titik posko atau fasilitas evakuasi.
+    Khusus Admin & Super Admin: Menghapus (Soft-Delete / Arsip) titik posko evakuasi.
+    Data tidak dihapus fisik untuk menjaga integritas riwayat pelaporan & audit trail darurat.
     """
-    query = text("DELETE FROM posko_evakuasi WHERE id = :posko_id RETURNING id, nama;")
+    query = text("""
+        UPDATE posko_evakuasi 
+        SET status = 'nonaktif', updated_at = now() 
+        WHERE id = :posko_id 
+        RETURNING id, nama, status;
+    """)
     res = await db.execute(query, {"posko_id": posko_id})
     row = res.fetchone()
 
@@ -459,16 +586,17 @@ async def delete_posko(
     await record_audit(
         db=db,
         pengguna_id=current_user.id,
-        aksi="DELETE_POSKO",
+        aksi="SOFT_DELETE_POSKO",
         tabel_target="posko_evakuasi",
         record_id=posko_id,
-        detail={"nama": row.nama},
+        detail={"nama": row.nama, "action": "archived_nonaktif"},
         ip_address=client_ip
     )
 
     await db.commit()
 
     return {
-        "message": f"Posko '{row.nama}' (ID {posko_id}) berhasil dihapus dari sistem.",
-        "id": row.id
+        "message": f"Posko '{row.nama}' (ID {posko_id}) berhasil dinonaktifkan & diarsipkan dari peta evakuasi publik.",
+        "id": row.id,
+        "status": row.status
     }

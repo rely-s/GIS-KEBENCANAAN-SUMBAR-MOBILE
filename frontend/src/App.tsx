@@ -2,31 +2,42 @@ import { useState, useEffect, useMemo } from 'react';
 import { MapCanvas, type GempaInfo } from './features/map/MapCanvas';
 import { WilayahPanel, type WilayahDampakData } from './features/telusuri-bencana/WilayahPanel';
 import { StatistikChart, type KecamatanStatItem } from './features/telusuri-bencana/StatistikChart';
-import { FilterPanel, type KotaKabupatenItem } from './features/filter/FilterPanel';
+import { type KotaKabupatenItem } from './features/filter/constants';
+import { UnifiedDrawer, type UnifiedDrawerTab } from './features/navigation/UnifiedDrawer';
 import { RouteInstructions, type EvakuasiRouteData } from './features/evakuasi/RouteInstructions';
 import { EvakuasiModal, type EvakuasiStartParams } from './features/evakuasi/EvakuasiModal';
 import { OperatorModal, type UserSession } from './features/operator/OperatorModal';
+import { CitizenReportModal } from './features/lapor/CitizenReportModal';
 import { OfflineBanner } from './features/pwa/OfflineBanner';
-import { LayerControlPanel, type LayerVisibilityState } from './features/map/LayerControlPanel';
+import type { LayerVisibilityState } from './features/map/types';
+import { ActiveLayerChips } from './features/map/ActiveLayerChips';
+import { FloatingSeismicCard } from './features/gempa/FloatingSeismicCard';
 import { SitrepModal } from './features/sitrep/SitrepModal';
 import { CuacaAlertModal } from './features/cuaca/CuacaAlertModal';
+import { MultiHazardRadarModal } from './features/proximity/MultiHazardRadarModal';
+import { useSSEEvents } from './hooks/useSSEEvents';
+import { DetailPoskoSheet, type PoskoDetailData } from './features/map/components/DetailPoskoSheet';
+import { DetailJalanSheet, type JalanTerputusDetailData } from './features/map/components/DetailJalanSheet';
+import { DetailAncamanSheet, type AncamanDetailData } from './features/map/components/DetailAncamanSheet';
+import { AccessibleShelterModal } from './features/accessibility/AccessibleShelterModal';
 import { 
+  Building2,
   Compass, 
-  Info, 
   Server,
   Layers,
   Radio,
+  Bell,
   Navigation,
   UserCheck,
   RefreshCw,
-  Moon,
-  Globe,
-  Map as MapIcon,
-  Mountain,
   FileText,
   CloudLightning,
   Crosshair,
-  ChevronUp
+  ChevronUp,
+  ChevronRight,
+  Search,
+  BookOpen,
+  AlertTriangle
 } from 'lucide-react';
 
 interface HealthStatus {
@@ -77,8 +88,81 @@ export function App() {
   const [poskoVersion, setPoskoVersion] = useState(0);
   const [bencanaVersion, setBencanaVersion] = useState(0);
 
-  // Gempa Real-Time BMKG
+  // State Detail Interactive Bottom Sheets (Touchscreen-Friendly Lapangan)
+  const [selectedPoskoSheet, setSelectedPoskoSheet] = useState<PoskoDetailData | null>(null);
+  const [selectedJalanSheet, setSelectedJalanSheet] = useState<JalanTerputusDetailData | null>(null);
+  const [selectedAncamanSheet, setSelectedAncamanSheet] = useState<AncamanDetailData | null>(null);
+
+  // Real-Time SSE Notification Hub (Pilar 7)
+  const [realtimeNotification, setRealtimeNotification] = useState<{
+    id: string;
+    title: string;
+    message: string;
+    type: 'gempa' | 'laporan' | 'bencana';
+  } | null>(null);
+
+  // Gempa Real-Time BMKG & Kalkulasi Jarak Geospasial ke Sumbar
   const [gempaData, setGempaData] = useState<GempaInfo | null>(null);
+
+  // Sambungkan ke Real-Time EWS Event Stream BPBD Sumbar
+  const { isConnected: isSSEConnected } = useSSEEvents({
+    onGempaBaru: (gempa) => {
+      fetch('/api/eksternal/gempa-terkini')
+        .then((res) => (res.ok ? res.json() : null))
+        .then((res) => {
+          if (res && res.data) setGempaData(res.data);
+        })
+        .catch(() => {});
+
+      setRealtimeNotification({
+        id: `GEMPA-${Date.now()}`,
+        title: `PERINGATAN DINI GEMPA M${gempa.magnitude || ''}`,
+        message: `${gempa.wilayah || 'Wilayah Sumatera Barat'} (Kedalaman: ${gempa.kedalaman_km || 10} km)`,
+        type: 'gempa'
+      });
+    },
+    onLaporanBaru: (laporan) => {
+      setRealtimeNotification({
+        id: `LAPOR-${Date.now()}`,
+        title: `Laporan Darurat Warga: ${(laporan.jenis_bencana || '').toUpperCase()}`,
+        message: `${laporan.wilayah || 'Sumatera Barat'} - Masuk antrean verifikasi Pusdalops.`,
+        type: 'laporan'
+      });
+    },
+    onLaporanDiverifikasi: (bencana) => {
+      setBencanaVersion((v) => v + 1);
+      setRealtimeNotification({
+        id: `VERIF-${Date.now()}`,
+        title: `Bencana Terverifikasi: ${(bencana.jenis_bencana || '').toUpperCase()}`,
+        message: `Status: ${bencana.status_verifikasi}. Peta publik diperbarui seketika.`,
+        type: 'bencana'
+      });
+    },
+    onBencanaBaru: () => {
+      setBencanaVersion((v) => v + 1);
+    }
+  });
+
+  // Auto-dismiss realtime notification setelah 10 detik
+  useEffect(() => {
+    if (!realtimeNotification) return;
+    const timer = setTimeout(() => {
+      setRealtimeNotification(null);
+    }, 10000);
+    return () => clearTimeout(timer);
+  }, [realtimeNotification]);
+
+  const distanceToSumbar = useMemo(() => {
+    if (!gempaData?.lat || !gempaData?.lon) return 0;
+    const R = 6371; // radius bumi dalam km
+    const dLat = (gempaData.lat - (-0.85)) * (Math.PI / 180);
+    const dLon = (gempaData.lon - 100.4172) * (Math.PI / 180);
+    const a =
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(-0.85 * (Math.PI / 180)) * Math.cos(gempaData.lat * (Math.PI / 180)) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return Math.round(R * c);
+  }, [gempaData]);
 
   // RBAC Petugas/Operator & Integrasi Spasial
   const [currentUser, setCurrentUser] = useState<UserSession | null>(() => {
@@ -90,15 +174,22 @@ export function App() {
     }
   });
   const [isOperatorModalOpen, setIsOperatorModalOpen] = useState(false);
+  const [isCitizenReportOpen, setIsCitizenReportOpen] = useState(false);
   const [pickingTarget, setPickingTarget] = useState<'evakuasi' | 'posko' | 'bencana' | null>(null);
   const [pickedOperatorCoords, setPickedOperatorCoords] = useState<{ lat: number; lng: number } | null>(null);
 
   // ==========================================
-  // STATE FASE 5: Mitigasi, SITREP, Cuaca, Layer Kontrol
+  // STATE FASE 5: Mitigasi, SITREP, Cuaca, Panel Terpadu
   // ==========================================
+  const [isUnifiedDrawerOpen, setIsUnifiedDrawerOpen] = useState(false);
+  const [unifiedDrawerTab, setUnifiedDrawerTab] = useState<UnifiedDrawerTab>('wilayah');
   const [isSitrepModalOpen, setIsSitrepModalOpen] = useState(false);
-  const [isLayerControlOpen, setIsLayerControlOpen] = useState(false);
+  const [isAccessibleModalOpen, setIsAccessibleModalOpen] = useState(false);
   const [isCuacaModalOpen, setIsCuacaModalOpen] = useState(false);
+  const [isRadarModalOpen, setIsRadarModalOpen] = useState(false);
+  const [radarBencanaList, setRadarBencanaList] = useState<any[]>([]);
+  const [radarPoskoList, setRadarPoskoList] = useState<any[]>([]);
+  const [radarJalanList, setRadarJalanList] = useState<any[]>([]);
   const [isPickingLocationOnMap, setIsPickingLocationOnMap] = useState(false);
   const [isEvakuasiMenuOpen, setIsEvakuasiMenuOpen] = useState(false);
   const [isEvakuasiModalOpen, setIsEvakuasiModalOpen] = useState(false);
@@ -106,7 +197,6 @@ export function App() {
     choropleth: true,
     poskoEvakuasi: true,
     shelterTes: true,
-    sirineTsunami: true,
     jalanTerputus: true,
     gempa: true,
     cuaca: true,
@@ -116,30 +206,108 @@ export function App() {
     zonaTsunami: true,
     tsunamiRunup: false,
   });
+  const [layerOpacities, setLayerOpacities] = useState<Record<string, number>>({
+    choropleth: 0.65,
+    zonaTsunami: 0.35,
+    tsunamiRunup: 0.45,
+    cuaca: 0.5,
+    sesarBuffer: 0.3,
+    megathrust: 0.25,
+  });
   const [evakuasiModa, setEvakuasiModa] = useState<'mobil' | 'jalan_kaki'>('mobil');
   const [cuacaAlerts, setCuacaAlerts] = useState<any[]>([]);
+
+  // Kalkulasi Kedekatan Spasial Geodesik (Spatial Proximity Engine Sesuai Evaluasi Riset)
+  const currentProximityThreat = useMemo(() => {
+    const targetLat = userCoords?.lat ?? -0.9471;
+    const targetLng = userCoords?.lng ?? 100.3543;
+
+    const threats = [
+      { id: 'marapi_galodo', nama: 'Koridor Batang Anai (Lahar Dingin Marapi)', lat: -0.485, lng: 100.345, bufferKm: 0.3, type: 'galodo' },
+      { id: 'sesar_sianok', nama: 'Segmen Sesar Sianok (Bukittinggi)', lat: -0.305, lng: 100.369, bufferKm: 2.5, type: 'sesar' },
+      { id: 'sesar_sumani', nama: 'Segmen Sesar Sumani (Singkarak - Solok)', lat: -0.750, lng: 100.620, bufferKm: 2.0, type: 'sesar' },
+      { id: 'sesar_suliti', nama: 'Segmen Sesar Suliti (Solok Selatan)', lat: -1.520, lng: 101.230, bufferKm: 2.0, type: 'sesar' },
+      { id: 'megathrust', nama: 'Megathrust Mentawai (Segmen Siberut Mw 8.9)', lat: -1.250, lng: 99.500, bufferKm: 45.0, type: 'megathrust' }
+    ];
+
+    let minDistanceKm = Infinity;
+    let nearest = threats[0];
+
+    for (const t of threats) {
+      const dLat = (t.lat - targetLat) * (Math.PI / 180);
+      const dLon = (t.lng - targetLng) * (Math.PI / 180);
+      const a =
+        Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+        Math.cos(targetLat * (Math.PI / 180)) * Math.cos(t.lat * (Math.PI / 180)) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+      const dKm = 6371 * c;
+      if (dKm < minDistanceKm) {
+        minDistanceKm = dKm;
+        nearest = t;
+      }
+    }
+
+    const distanceMeters = Math.round(minDistanceKm * 1000);
+    let status: 'BAHAYA' | 'WASPADA' | 'AMAN' = 'AMAN';
+    let message = 'Zona Aman Geologis';
+    let directive = 'Lokasi terpantau aman dari sempadan patahan aktif & potensi bahaya geologis.';
+
+    if (minDistanceKm <= nearest.bufferKm) {
+      status = 'BAHAYA';
+      message = `Zona Bahaya: ${nearest.nama}`;
+      directive = nearest.type === 'megathrust'
+        ? 'Evakuasi mandiri ke dataran tinggi (>15 mdpl) atau shelter TES terdekat!'
+        : 'Segera jauhi tebing lereng curam & sempadan sungai!';
+    } else if (minDistanceKm <= nearest.bufferKm * 2.5) {
+      status = 'WASPADA';
+      message = `Waspada: Mendekati ${nearest.nama} (${minDistanceKm.toFixed(1)} km)`;
+      directive = 'Tetap siaga dan pantau stabilitas tanah lereng / debit air.';
+    }
+
+    return {
+      status,
+      nearestThreat: nearest.nama,
+      distanceMeters,
+      distanceKm: minDistanceKm.toFixed(1),
+      message,
+      directive,
+    };
+  }, [userCoords]);
 
   // State Ringkasan Fasilitas Dinamis (SITREP & Layer Control)
   const [facilityCounts, setFacilityCounts] = useState<{
     posko: number;
     tes: number;
-    sirine: number;
     faskes: number;
     total: number;
   }>({
     posko: 18,
     tes: 7,
-    sirine: 46,
     faskes: 1,
     total: 26,
   });
 
-  // 1. Cek Koneksi Backend API & Database
+  // 1. Cek Koneksi Backend API & Validasi Sesi HttpOnly Cookie (OWASP K1)
   useEffect(() => {
     fetch('/api/health')
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => setHealth(data))
       .catch(() => setHealth({ status: 'offline', database: 'disconnected' }));
+
+    // Verifikasi sesi HttpOnly cookie pengguna
+    fetch('/api/auth/me', { credentials: 'include' })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((user) => {
+        if (user) {
+          setCurrentUser(user);
+          localStorage.setItem('gis_user', JSON.stringify(user));
+        } else if (localStorage.getItem('gis_user')) {
+          setCurrentUser(null);
+          localStorage.removeItem('gis_user');
+          localStorage.removeItem('gis_auth_token');
+        }
+      })
+      .catch(() => {});
   }, []);
 
   // 1b. Fetch Data Fasilitas SITREP untuk Sinkronisasi Presisi Layer & Tab Evaluasi
@@ -151,7 +319,6 @@ export function App() {
           setFacilityCounts({
             posko: data.fasilitas.posko_pengungsi_count ?? 18,
             tes: data.fasilitas.shelter_tes_count ?? 7,
-            sirine: data.fasilitas.total_sirine ?? 46,
             faskes: data.fasilitas.faskes_count ?? 1,
             total: data.fasilitas.total_titik_evakuasi ?? 26,
           });
@@ -196,6 +363,34 @@ export function App() {
     return () => clearInterval(interval);
   }, []);
 
+  // 2c. Fetch Data Spasial Real-time untuk Matriks Radar Multi-Bencana
+  useEffect(() => {
+    fetch('/api/bencana?limit=50')
+      .then((res) => (res.ok ? res.json() : null))
+      .then((res) => {
+        if (res && res.data) setRadarBencanaList(res.data);
+      })
+      .catch(() => {});
+  }, [bencanaVersion]);
+
+  useEffect(() => {
+    fetch('/api/posko')
+      .then((res) => (res.ok ? res.json() : null))
+      .then((res) => {
+        if (res && res.features) setRadarPoskoList(res.features);
+      })
+      .catch(() => {});
+  }, [poskoVersion]);
+
+  useEffect(() => {
+    fetch('/api/jalan-terputus')
+      .then((res) => (res.ok ? res.json() : null))
+      .then((res) => {
+        if (res && res.features) setRadarJalanList(res.features);
+      })
+      .catch(() => {});
+  }, [jalanVersion]);
+
   // 3. Bangun URL Choropleth Berdasarkan Filter (Default: Kabupaten/Kota Resmi Sumbar)
   const choroplethUrl = useMemo(() => {
     const params = new URLSearchParams();
@@ -222,6 +417,18 @@ export function App() {
         console.error('Gagal mengambil data choropleth:', err);
       });
   }, [choroplethUrl, bencanaVersion]);
+
+  // 4a. Refresh otomatis data rincian dampak wilayah aktif jika data bencana di-update
+  useEffect(() => {
+    if (selectedWilayahId && bencanaVersion > 0) {
+      fetch(`/api/wilayah/${selectedWilayahId}/dampak`)
+        .then((res) => (res.ok ? res.json() : null))
+        .then((data: WilayahDampakData) => {
+          if (data) setWilayahDampak(data);
+        })
+        .catch(() => {});
+    }
+  }, [bencanaVersion, selectedWilayahId]);
 
   // 4b. Muat komprehensif 181 kecamatan se-Sumbar dari static GeoJSON untuk fitur "Cari Cepat"
   // Dilakukan sekali saat startup agar pencarian kecamatan menemukan seluruh 181 kecamatan instan
@@ -269,7 +476,7 @@ export function App() {
   // 5. Handler Pemilihan Wilayah (Klik Peta / Klik Grafik / Hasil Pencarian)
   const handleSelectWilayah = (wilayahId: number, properties?: any) => {
     setSelectedWilayahId(wilayahId);
-    setIsLayerControlOpen(false); // Cegah tumpang-tindih panel di sisi kanan
+    setIsUnifiedDrawerOpen(false);
     setLoadingDampak(true);
 
     // FIX: Jika properties sudah mengandung koordinat, flyTo langsung sebelum fetch selesai
@@ -382,7 +589,7 @@ export function App() {
   const handleSelectKota = (kota: KotaKabupatenItem) => {
     setActiveKotaInfo(kota);
     setActiveKecamatanInfo(null);
-    setIsLayerControlOpen(false);
+    setIsUnifiedDrawerOpen(false);
 
     // 1. Direct flyTo ke lokasi Kota/Kabupaten
     setFlyToCoords({ lat: kota.lat, lng: kota.lon, zoom: 11.5 });
@@ -616,292 +823,305 @@ export function App() {
   const handleLoginSuccess = (user: UserSession, token: string) => {
     setCurrentUser(user);
     localStorage.setItem('gis_user', JSON.stringify(user));
-    localStorage.setItem('gis_auth_token', token);
+    // Sesuai OWASP K1: Jangan simpan plaintext JWT token sensitif di localStorage jika tidak perlu.
+    // Backend mengelola HttpOnly SameSite Cookie 'access_token' secara aman.
+    if (token) localStorage.setItem('gis_auth_token', token);
   };
 
   const handleLogout = () => {
-    fetch('/api/auth/logout', { method: 'POST' }).catch(() => {});
+    fetch('/api/auth/logout', { 
+      method: 'POST',
+      credentials: 'include'
+    }).catch(() => {});
     setCurrentUser(null);
     localStorage.removeItem('gis_user');
     localStorage.removeItem('gis_auth_token');
     setIsOperatorModalOpen(false);
   };
 
+  // Handlers Interaktif Klik Objek Peta (Anti Dead-Click & Touchscreen Lapangan)
+  const handlePoskoClick = (feature: any) => {
+    const p = feature.properties || {};
+    const geom = feature.geometry || {};
+    const coords = geom.coordinates || [100.3543, -0.9471];
+    setSelectedPoskoSheet({
+      id: p.id || Math.random(),
+      nama: p.nama || 'Posko Evakuasi',
+      jenis: p.jenis || 'posko_utama',
+      alamat: p.alamat || p.lokasi,
+      kapasitas: p.kapasitas,
+      terisi: p.terisi,
+      status: p.status || 'aktif',
+      kontak_pic: p.kontak_pic || p.pic,
+      kontak_telepon: p.kontak_telepon || p.telepon,
+      lat: coords[1],
+      lon: coords[0],
+      fasilitas: Array.isArray(p.fasilitas) ? p.fasilitas : [],
+      jumlah_lansia: p.jumlah_lansia || 0,
+      jumlah_balita: p.jumlah_balita || 0,
+      jumlah_disabilitas: p.jumlah_disabilitas || 0,
+      jumlah_ibu_hamil: p.jumlah_ibu_hamil || 0,
+      ketersediaan_air_bersih: p.ketersediaan_air_bersih ?? true,
+      ketersediaan_dapur_umum: p.ketersediaan_dapur_umum ?? false,
+      ketersediaan_tenaga_medis: p.ketersediaan_tenaga_medis ?? false,
+    });
+    setSelectedJalanSheet(null);
+    setSelectedAncamanSheet(null);
+  };
+
+  const handleJalanClick = (feature: any) => {
+    const p = feature.properties || {};
+    setSelectedJalanSheet({
+      id: p.id || 0,
+      alasan: p.alasan || 'Ruas Jalan Terputus',
+      deskripsi: p.deskripsi,
+      status: p.status || 'aktif',
+      nama_ruas: p.nama_ruas,
+      koridor_alternatif: p.koridor_alternatif,
+      created_at: p.created_at,
+    });
+    setSelectedPoskoSheet(null);
+    setSelectedAncamanSheet(null);
+  };
+
+  const handleAncamanClick = (info: any) => {
+    setSelectedAncamanSheet({
+      tipe: info.jenis || 'sesar',
+      judul: info.nama || 'Ancaman Geologis',
+      subJudul: info.deskripsi,
+      badge: (info.jenis || '').toUpperCase(),
+      properties: info.metadata || {},
+    });
+    setSelectedPoskoSheet(null);
+    setSelectedJalanSheet(null);
+  };
+
   return (
-    <div className="relative w-screen h-screen overflow-hidden bg-[#0F1720] font-body text-slate-100 select-none">
-      {/* PWA Indikator Status Offline (Fase 4) */}
+    <div className="relative w-screen h-[100dvh] overflow-hidden bg-[#0F1720] font-body text-slate-100 select-none">
+      {/* PWA Indikator Status Offline */}
       <OfflineBanner />
 
-      {/* 1. HEADER UTAMA (Overlay Tipis Elegan di Atas Peta) */}
-      <header className="absolute top-0 left-0 right-0 z-20 pointer-events-none p-2 sm:p-3 md:p-4 flex items-center justify-between gap-2">
+      {/* 1. HEADER UTAMA (Floating Ramping <= 52px di Atas Peta) */}
+      <header className="absolute top-0 left-0 right-0 z-20 pointer-events-none p-2 sm:p-2.5 flex items-center justify-between gap-2">
         {/* Identitas Kolaborasi Resmi: BNPB, Pemprov Sumbar, & LPPM UPI YPTK */}
-        <div className="pointer-events-auto flex items-center gap-2.5 sm:gap-3.5 bg-[#0B131D]/95 backdrop-blur-2xl px-3 py-2 sm:px-4 sm:py-2.5 rounded-2xl border border-[#2B3E52] shadow-2xl transition-all shrink-0">
-          {/* Trio Logo Resmi Instansi dengan Base Card Putih Kontras Tinggi */}
-          <div className="flex items-center gap-1.5 sm:gap-2 pr-2.5 sm:pr-3.5 border-r border-[#243444] shrink-0">
-            {/* Logo BNPB */}
+        <div className="pointer-events-auto flex items-center gap-2.5 bg-[#0B131D]/95 backdrop-blur-2xl px-3 py-1.5 rounded-xl border border-[#2B3E52] shadow-2xl transition-all shrink-0">
+          {/* Trio Logo Resmi Instansi */}
+          <div className="flex items-center gap-1.5 pr-2.5 border-r border-[#243444] shrink-0">
             <div 
-              className="flex items-center justify-center w-8 h-8 sm:w-9 sm:h-9 md:w-10 md:h-10 rounded-xl bg-white shadow-sm border border-white/90 p-1 hover:scale-105 transition-transform" 
+              className="flex items-center justify-center w-8 h-8 rounded-lg bg-white shadow-sm p-0.5 hover:scale-105 transition-transform" 
               title="Badan Nasional Penanggulangan Bencana (BNPB)"
             >
-              <img
-                src="/logos/bnpb.png"
-                alt="Logo BNPB"
-                className="w-full h-full object-contain filter drop-shadow-xs"
-              />
+              <img src="/logos/bnpb.png" alt="Logo BNPB" className="w-full h-full object-contain" />
             </div>
-            {/* Logo Pemprov Sumbar */}
             <div 
-              className="flex items-center justify-center w-8 h-8 sm:w-9 sm:h-9 md:w-10 md:h-10 rounded-xl bg-white shadow-sm border border-white/90 p-1 overflow-hidden hover:scale-105 transition-transform" 
+              className="flex items-center justify-center w-8 h-8 rounded-lg bg-white shadow-sm p-0.5 overflow-hidden hover:scale-105 transition-transform" 
               title="Pemerintah Provinsi Sumatera Barat (BPBD Sumbar)"
             >
-              <img
-                src="/logos/pemprov-sumbar.jpg"
-                alt="Logo Pemprov Sumbar"
-                className="w-full h-full object-contain rounded filter drop-shadow-xs"
-              />
+              <img src="/logos/pemprov-sumbar.jpg" alt="Logo Pemprov Sumbar" className="w-full h-full object-contain rounded" />
             </div>
-            {/* Logo UPI YPTK Padang */}
             <div 
-              className="flex items-center justify-center w-8 h-8 sm:w-9 sm:h-9 md:w-10 md:h-10 rounded-xl bg-white shadow-sm border border-white/90 p-1 hover:scale-105 transition-transform" 
+              className="flex items-center justify-center w-8 h-8 rounded-lg bg-white shadow-sm p-0.5 hover:scale-105 transition-transform" 
               title="Universitas Putra Indonesia YPTK Padang (Riset LPPM)"
             >
-              <img
-                src="/logos/upi-yptk.png"
-                alt="Logo UPI YPTK"
-                className="w-full h-full object-contain filter drop-shadow-xs"
-              />
+              <img src="/logos/upi-yptk.png" alt="Logo UPI YPTK" className="w-full h-full object-contain" />
             </div>
           </div>
 
-          {/* Teks Identitas & Kredensial Resmi */}
+          {/* Teks Identitas */}
           <div className="min-w-0">
-            <div className="flex items-center gap-2">
-              <h1 className="text-xs sm:text-sm md:text-base font-extrabold tracking-tight text-white font-display uppercase truncate">
+            <div className="flex items-center gap-1.5">
+              <h1 className="text-xs sm:text-sm font-black tracking-tight text-white font-display uppercase truncate">
                 GIS Kebencanaan
               </h1>
-              <span className="px-2 py-0.5 text-[9px] sm:text-[10px] font-mono font-bold rounded-md bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 shrink-0">
+              <span className="px-1.5 py-0.2 text-[9px] font-mono font-bold rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 shrink-0">
                 PROV. SUMBAR
               </span>
+              <span 
+                className={`px-1.5 py-0.2 text-[9px] font-mono font-bold rounded border shrink-0 hidden xs:flex items-center gap-1 ${
+                  isSSEConnected
+                    ? 'bg-emerald-950/60 border-emerald-500/50 text-emerald-300'
+                    : 'bg-amber-950/60 border-amber-500/50 text-amber-300'
+                }`} 
+                title={isSSEConnected ? 'Real-Time EWS Stream Terhubung (SSE Live)' : 'Menghubungkan ke EWS Stream...'}
+              >
+                <span className={`w-1.5 h-1.5 rounded-full ${isSSEConnected ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'}`} />
+                {isSSEConnected ? 'EWS LIVE' : 'CONNECTING'}
+              </span>
             </div>
-            <div className="flex items-center gap-1.5 mt-0.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse shrink-0 hidden sm:inline-block" />
-              <p className="text-[9px] sm:text-[10px] text-slate-300 font-mono tracking-tight hidden sm:block truncate max-w-[280px] md:max-w-none">
-                BPBD Prov. Sumbar & Riset LPPM UPI YPTK
-              </p>
-            </div>
+            <p className="text-[10px] text-slate-300 font-mono hidden sm:block truncate">
+              BPBD Prov. Sumbar &amp; Riset LPPM UPI YPTK
+            </p>
           </div>
         </div>
 
-        {/* Ticker Informasi Gempa Terkini BMKG (Jika Tersedia) */}
-        {gempaData && (
-          <div 
-            onClick={() => {
-              if (gempaData.lat && gempaData.lon) {
-                setLayerVisibility((prev) => ({ ...prev, gempa: true }));
-                setFlyToCoords({ lat: gempaData.lat, lng: gempaData.lon, zoom: 7.5 });
-              }
-            }}
-            className="pointer-events-auto hidden xl:flex items-center gap-2.5 px-3 py-1.5 rounded-xl bg-[#0F1720]/90 backdrop-blur-md border border-rose-500/40 shadow-xl cursor-pointer hover:border-rose-400 transition-all group shrink-0"
-            title="Klik untuk menerbangkan kamera ke titik pusat gempa BMKG"
-          >
-            <div className="relative flex items-center justify-center w-2.5 h-2.5">
-              <span className="absolute w-full h-full rounded-full bg-rose-500 animate-ping" />
-              <span className="relative w-2 h-2 rounded-full bg-rose-600" />
-            </div>
-            <div className="text-xs flex items-center">
-              <span className="font-bold text-rose-400 font-display shrink-0">
-                M{gempaData.magnitude}
-              </span>
-              <span className="text-slate-300 ml-1.5 font-sans truncate max-w-[180px] 2xl:max-w-[280px]" title={gempaData.wilayah_teks}>
-                {gempaData.wilayah_teks}
-              </span>
-              {gempaData.potensi_tsunami && (
-                <span className="ml-2 px-1.5 py-0.2 rounded bg-rose-600 text-white font-bold text-[9px] uppercase animate-pulse shrink-0">
-                  TSUNAMI
-                </span>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* Notifikasi Cepat: Jika Kamera Sedang Melihat Gempa di Luar Sumbar */}
-        {flyToCoords && gempaData && flyToCoords.lat === gempaData.lat && (gempaData.lon > 102.5 || gempaData.lon < 98 || gempaData.lat < -3.5 || gempaData.lat > 0.8) && (
-          <div className="pointer-events-auto hidden md:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-[#131D27]/95 border border-amber-500/60 shadow-xl text-xs text-amber-200 animate-in fade-in">
-            <span className="text-[11px]">Pusat gempa berada di luar Sumbar</span>
-            <button
-              onClick={() => setFlyToCoords({ lat: -0.85, lng: 100.4172, zoom: 8.4 })}
-              className="px-2 py-0.5 rounded bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-[10px] transition-colors"
-            >
-              Kembali ke Sumbar
-            </button>
-          </div>
-        )}
-
-        {/* Ticker Peringatan Cuaca Ekstrem BMKG & Galodo (Fase 5) */}
+        {/* Ticker Cuaca Ringkas */}
         {cuacaAlerts.length > 0 && (
           <div 
             onClick={() => setIsCuacaModalOpen(true)}
-            className="pointer-events-auto hidden 2xl:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-[#0F1720]/90 backdrop-blur-md border border-amber-500/40 shadow-xl cursor-pointer hover:border-amber-400 hover:bg-amber-950/30 transition-all text-xs group shrink-0"
-            title="Klik untuk melihat Detail Peringatan Cuaca Ekstrem & Potensi Banjir/Galodo"
+            className="pointer-events-auto hidden xl:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-[#0B131D]/90 backdrop-blur-md border border-amber-500/40 shadow-xl cursor-pointer hover:border-amber-400 text-xs shrink-0"
+            title="Peringatan Cuaca Ekstrem BMKG"
           >
-            <CloudLightning className="w-3.5 h-3.5 text-amber-400 animate-pulse shrink-0" />
-            <div className="flex items-center gap-1.5 font-sans">
-              <span className="font-bold text-amber-400 group-hover:text-amber-300">
-                {cuacaAlerts[0].event || 'Cuaca Ekstrem'}
-              </span>
-              <span className="text-slate-300 text-[11px]">
-                ({cuacaAlerts.length} Wilayah)
-              </span>
-            </div>
-            <span className="ml-1 text-[10px] text-amber-400 font-mono underline opacity-80 group-hover:opacity-100">
-              Detail &raquo;
-            </span>
+            <CloudLightning className="w-3.5 h-3.5 text-amber-400 animate-pulse" />
+            <span className="font-bold text-amber-400">{cuacaAlerts[0].event || 'Cuaca Ekstrem'}</span>
+            <span className="text-slate-300 text-[10px]">({cuacaAlerts.length} Wilayah)</span>
           </div>
         )}
 
-        {/* Kontrol Kanan (Basemap Switcher, 3D Toggle, Layer Control, SITREP, Petugas RBAC, Server Status, Legenda) */}
-        <div className="pointer-events-auto flex items-center gap-1.5 sm:gap-2 shrink-0">
-          {/* Tombol Layer Control Panel (Fase 5) */}
+        {/* Kontrol Kanan (Panel Terpadu: Wilayah, Layer, SITREP, Petugas RBAC, Legenda) */}
+        <div className="pointer-events-auto flex items-center gap-1.5 shrink-0">
+          {/* Tombol Pencarian & Filter Wilayah */}
           <button
             onClick={() => {
-              setIsLayerControlOpen((prev) => {
-                if (!prev) {
-                  setSelectedWilayahId(null);
-                  setWilayahDampak(null);
-                }
-                return !prev;
-              });
+              setUnifiedDrawerTab('wilayah');
+              setIsUnifiedDrawerOpen((curr) => (!curr || unifiedDrawerTab !== 'wilayah'));
             }}
-            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl backdrop-blur-md border text-xs font-semibold shadow-lg transition-all ${
-              isLayerControlOpen
-                ? 'bg-blue-600/30 border-blue-400 text-blue-300'
-                : 'bg-[#0F1720]/80 border-[#243444] text-slate-300 hover:text-white hover:bg-[#1B2733]'
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl backdrop-blur-md border text-xs font-bold shadow-md transition-all ${
+              isUnifiedDrawerOpen && unifiedDrawerTab === 'wilayah'
+                ? 'bg-sky-600/30 border-sky-400 text-sky-300'
+                : 'bg-[#0B131D]/90 border-[#2B3E52] text-slate-200 hover:text-white hover:bg-[#152230]'
             }`}
-            title="Kontrol Lapisan Peta (Choropleth, Posko Pengungsi, TES Tsunami, Sirine, Cuaca BMKG)"
+            title="Pusat Pencarian & Filter Wilayah Nagari"
           >
-            <Layers className="w-3.5 h-3.5 text-blue-400" />
-            <span className="hidden sm:inline font-mono">Layer</span>
+            <Search className="w-3.5 h-3.5 text-sky-400" />
+            <span className="hidden sm:inline font-mono">Wilayah</span>
           </button>
 
-          {/* Tombol SITREP BNPB (Fase 5) */}
+          {/* Tombol Katalog Layer Multibahaya InaRISK */}
+          <button
+            onClick={() => {
+              setUnifiedDrawerTab('lapisan');
+              setIsUnifiedDrawerOpen((curr) => (!curr || unifiedDrawerTab !== 'lapisan'));
+            }}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl backdrop-blur-md border text-xs font-bold shadow-md transition-all ${
+              isUnifiedDrawerOpen && unifiedDrawerTab === 'lapisan'
+                ? 'bg-sky-600/30 border-sky-400 text-sky-300'
+                : 'bg-[#0B131D]/90 border-[#2B3E52] text-slate-200 hover:text-white hover:bg-[#152230]'
+            }`}
+            title="Katalog Lapisan Multibahaya InaRISK BNPB"
+          >
+            <Layers className="w-3.5 h-3.5 text-sky-400" />
+            <span className="hidden sm:inline font-mono">Katalog Layer</span>
+          </button>
+
+          {/* Tombol Aksesibilitas WCAG: Daftar Tabel Posko */}
+          <button
+            onClick={() => setIsAccessibleModalOpen(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-950/70 hover:bg-emerald-900/90 backdrop-blur-md border border-emerald-500/50 text-emerald-200 text-xs font-bold shadow-md transition-all cursor-pointer"
+            title="Daftar Posko Evakuasi Aksesibel (Mode Tabel & Screen Reader WCAG 2.1 AA)"
+            aria-label="Buka Daftar Tabel Aksesibel Posko Evakuasi"
+          >
+            <Building2 className="w-3.5 h-3.5 text-emerald-400" />
+            <span className="hidden lg:inline font-mono">Daftar Posko</span>
+          </button>
+
+          {/* Tombol SITREP BNPB */}
           <button
             onClick={() => setIsSitrepModalOpen(true)}
-            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-rose-950/60 hover:bg-rose-900/80 backdrop-blur-md border border-rose-500/40 text-rose-200 text-xs font-semibold shadow-lg transition-all"
-            title="Laporan Situasi Eksekutif (SITREP BNPB) & Ringkasan WhatsApp"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-rose-950/70 hover:bg-rose-900/90 backdrop-blur-md border border-rose-500/50 text-rose-200 text-xs font-bold shadow-md transition-all"
+            title="Laporan Situasi Eksekutif (SITREP BNPB)"
           >
             <FileText className="w-3.5 h-3.5 text-rose-400" />
             <span className="hidden md:inline font-mono">SITREP</span>
           </button>
-          {/* Basemap Switcher: Satelit Rill (Gambar 2), Topografi, Gelap */}
-          <div className="flex items-center bg-[#0F1720]/85 backdrop-blur-md rounded-xl p-1 border border-[#243444] shadow-xl">
-            <button
-              onClick={() => setStyleVariant('satelit')}
-              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-                styleVariant === 'satelit'
-                  ? 'bg-emerald-600/90 text-white shadow-md border border-emerald-400/40'
-                  : 'text-slate-400 hover:text-white hover:bg-[#1B2733]'
-              }`}
-              title="Peta Satelit Hibrida Rill (Citra Satelit Bumi Nyata & Label Wilayah)"
-            >
-              <Globe className="w-3.5 h-3.5 text-emerald-300" />
-              <span className="hidden xl:inline">Satelit</span>
-            </button>
-            <button
-              onClick={() => setStyleVariant('terang')}
-              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-                styleVariant === 'terang'
-                  ? 'bg-amber-600/90 text-white shadow-md border border-amber-400/40'
-                  : 'text-slate-400 hover:text-white hover:bg-[#1B2733]'
-              }`}
-              title="Peta Topografi Berwarna & Kontur Alami"
-            >
-              <MapIcon className="w-3.5 h-3.5 text-amber-300" />
-              <span className="hidden xl:inline">Topografi</span>
-            </button>
-            <button
-              onClick={() => setStyleVariant('gelap')}
-              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-                styleVariant === 'gelap'
-                  ? 'bg-slate-700/90 text-white shadow-md border border-slate-500/40'
-                  : 'text-slate-400 hover:text-white hover:bg-[#1B2733]'
-              }`}
-              title="Mode Gelap Operasional Malam (Pusdalops)"
-            >
-              <Moon className="w-3.5 h-3.5 text-slate-300" />
-              <span className="hidden xl:inline">Gelap</span>
-            </button>
-          </div>
 
-          {/* Toggle 3D Terrain Elevasi (Default: 2D Ringan & Dingin) */}
+          {/* Tombol Lapor Cepat Warga (PWA Crowdsourcing) */}
           <button
-            onClick={() => setIs3DTerrain((prev) => !prev)}
-            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl backdrop-blur-md border text-xs font-mono transition-all shadow-md ${
-              is3DTerrain
-                ? 'bg-amber-500/25 border-amber-400 text-amber-300 shadow-amber-500/10'
-                : 'bg-[#0F1720]/85 border-[#243444] text-slate-300 hover:text-white hover:bg-[#1B2733]'
-            }`}
-            title={is3DTerrain ? 'Matikan 3D Terrain (Kembali ke Mode 2D Ringan & Hemat Daya)' : 'Aktifkan 3D Terrain Elevasi (Membutuhkan komputasi GPU)'}
+            onClick={() => setIsCitizenReportOpen(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-rose-600/90 to-amber-600/90 hover:from-rose-500 hover:to-amber-500 text-white backdrop-blur-md border border-rose-400/60 text-xs font-bold shadow-md shadow-rose-950/40 transition-all hover:scale-[1.02] active:scale-[0.98]"
+            title="Lapor Cepat Kejadian Bencana Lapangan (Warga)"
           >
-            <Mountain className={`w-3.5 h-3.5 ${is3DTerrain ? 'text-amber-400' : 'text-slate-400'}`} />
-            <span className="hidden xl:inline">
-              {is3DTerrain ? '3D Aktif' : 'Mode 2D'}
-            </span>
+            <AlertTriangle className="w-3.5 h-3.5 text-amber-200 animate-pulse" />
+            <span className="font-mono whitespace-nowrap">Lapor Warga</span>
           </button>
 
-          {/* Tombol Login / Akses Petugas */}
+          {/* Tombol Portal Komando / Petugas */}
           <button
             onClick={() => setIsOperatorModalOpen(true)}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-semibold shadow-lg transition-all ${
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-semibold shadow-md transition-all ${
               currentUser?.role === 'pimpinan'
-                ? 'bg-amber-500/25 border-amber-400 text-amber-300 hover:bg-amber-500/35'
-                : currentUser?.role === 'admin'
-                ? 'bg-blue-600/25 border-blue-400 text-blue-300 hover:bg-blue-600/35'
-                : currentUser?.role === 'operator'
-                ? 'bg-emerald-600/25 border-emerald-400 text-emerald-300 hover:bg-emerald-600/35'
-                : 'bg-[#0F1720]/80 border-[#243444] text-slate-300 hover:bg-[#1B2733] hover:text-white'
+                ? 'bg-amber-500/25 border-amber-400 text-amber-300'
+                : currentUser?.role === 'admin' || currentUser?.role === 'super_admin'
+                ? 'bg-blue-600/25 border-blue-400 text-blue-300'
+                : currentUser?.role === 'operator' || currentUser?.role === 'pusdalops'
+                ? 'bg-emerald-600/25 border-emerald-400 text-emerald-300'
+                : 'bg-[#0B131D]/90 border-[#2B3E52] text-slate-200 hover:bg-[#152230] hover:text-white'
             }`}
           >
-            <UserCheck className={`w-3.5 h-3.5 ${
-              currentUser?.role === 'pimpinan' ? 'text-amber-300' : currentUser?.role === 'admin' ? 'text-blue-300' : 'text-emerald-400'
-            }`} />
+            <UserCheck className="w-3.5 h-3.5 text-emerald-400" />
             <span className="hidden xl:inline font-mono whitespace-nowrap">
-              {currentUser?.role === 'pimpinan'
-                ? 'Pimpinan BPBD'
-                : currentUser?.role === 'admin'
-                ? 'Admin Pusdalops'
-                : currentUser?.role === 'operator'
-                ? 'Operator Padang'
-                : 'Portal Petugas'}
+              {currentUser?.nama ? currentUser.nama.split(' ')[0] : 'Portal Petugas'}
             </span>
           </button>
 
-          {/* Status Koneksi API */}
+          {/* Status Server */}
           <div 
-            className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-[#0F1720]/80 backdrop-blur-md border border-[#243444] text-xs font-mono text-slate-300 shadow-lg"
-            title={`Status Backend: ${health?.status || 'Memeriksa...'}`}
+            className="flex items-center gap-1.5 px-2 py-1.5 rounded-xl bg-[#0B131D]/90 border border-[#2B3E52] text-xs font-mono text-slate-300 shadow-md"
+            title={`Status Server: ${health?.status || 'Memeriksa...'}`}
           >
             <Server className="w-3.5 h-3.5 text-blue-400" />
-            <span
-              className={`w-2 h-2 rounded-full ${
-                health?.status === 'ok' ? 'bg-emerald-400 animate-pulse' : 'bg-rose-500'
-              }`}
-            />
+            <span className={`w-2 h-2 rounded-full ${health?.status === 'ok' ? 'bg-emerald-400 animate-pulse' : 'bg-rose-500'}`} />
           </div>
 
-          {/* Toggle Legenda GIS */}
+          {/* Toggle Legenda & Panduan Risiko */}
           <button
-            onClick={() => setShowInfoPanel(!showInfoPanel)}
-            className={`p-2 rounded-lg backdrop-blur-md border transition-all ${
-              showInfoPanel
+            onClick={() => {
+              setUnifiedDrawerTab('legenda');
+              setIsUnifiedDrawerOpen((curr) => (!curr || unifiedDrawerTab !== 'legenda'));
+            }}
+            className={`p-1.5 rounded-xl border transition-all ${
+              isUnifiedDrawerOpen && unifiedDrawerTab === 'legenda'
                 ? 'bg-amber-500/20 border-amber-500 text-amber-300'
-                : 'bg-[#0F1720]/80 border-[#243444] text-slate-300 hover:text-white hover:bg-[#1B2733]'
+                : 'bg-[#0B131D]/90 border-[#2B3E52] text-slate-300 hover:text-white hover:bg-[#152230]'
             }`}
-            title="Legenda & Status Sistem"
+            title="Legenda & Simbol Peta"
           >
-            <Info className="w-4 h-4" />
+            <BookOpen className="w-4 h-4" />
           </button>
         </div>
       </header>
+
+      {/* 1b. FLOATING REAL-TIME EWS NOTIFICATION BANNER */}
+      {realtimeNotification && (
+        <div className="absolute top-16 left-1/2 -translate-x-1/2 z-30 pointer-events-auto max-w-lg w-[92%] sm:w-auto animate-in slide-in-from-top-4 fade-in duration-300">
+          <div className={`p-3 rounded-2xl shadow-2xl backdrop-blur-xl border flex items-center gap-3 ${
+            realtimeNotification.type === 'gempa'
+              ? 'bg-[#1C0F14]/95 border-rose-500/60 text-rose-100 shadow-rose-950/50'
+              : realtimeNotification.type === 'laporan'
+              ? 'bg-[#0B1524]/95 border-sky-500/60 text-sky-100 shadow-sky-950/50'
+              : 'bg-[#0D1C16]/95 border-emerald-500/60 text-emerald-100 shadow-emerald-950/50'
+          }`}>
+            <div className={`p-2 rounded-xl shrink-0 ${
+              realtimeNotification.type === 'gempa'
+                ? 'bg-rose-500/20 text-rose-400 border border-rose-500/40'
+                : realtimeNotification.type === 'laporan'
+                ? 'bg-sky-500/20 text-sky-400 border border-sky-500/40'
+                : 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40'
+            }`}>
+              {realtimeNotification.type === 'gempa' ? (
+                <Radio className="w-5 h-5 animate-pulse" />
+              ) : (
+                <Bell className="w-5 h-5 animate-bounce" />
+              )}
+            </div>
+            <div className="min-w-0 pr-2">
+              <div className="text-xs font-bold font-display uppercase tracking-wide flex items-center gap-1.5">
+                <span>{realtimeNotification.title}</span>
+                <span className="text-[9px] font-mono px-1 py-0.2 rounded bg-black/40 text-slate-300">LIVE</span>
+              </div>
+              <p className="text-[11px] text-slate-300 truncate">
+                {realtimeNotification.message}
+              </p>
+            </div>
+            <button
+              onClick={() => setRealtimeNotification(null)}
+              className="p-1 rounded-lg hover:bg-white/10 text-slate-400 hover:text-white shrink-0"
+              title="Tutup pemberitahuan"
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Banner Mode Penentuan Titik di Peta (Dinamis: Warga / Petugas) */}
       {isPickingLocationOnMap && (
@@ -909,7 +1129,7 @@ export function App() {
           <Crosshair className="w-5 h-5 animate-spin shrink-0 text-slate-950" />
           <div className="text-xs sm:text-sm font-sans">
             {pickingTarget === 'posko' ? (
-              <span><b>Mode Petugas:</b> Klik pada peta untuk menentukan koordinat lokasi Posko / Shelter TES / Sirine</span>
+              <span><b>Mode Petugas:</b> Klik pada peta untuk menentukan koordinat lokasi Posko / Shelter TES</span>
             ) : pickingTarget === 'bencana' ? (
               <span><b>Mode Petugas:</b> Klik pada peta untuk menentukan episentrum koordinat kejadian bencana</span>
             ) : (
@@ -937,6 +1157,7 @@ export function App() {
           selectedWilayahId={selectedWilayahId}
           selectedBoundariesGeoJSON={selectedKotaBoundaries}
           selectedKecamatanHighlightId={activeKecamatanInfo?.id || selectedWilayahId}
+          choroplethUrl={choroplethUrl}
           flyToCoords={flyToCoords}
           routeGeometry={routeData?.geometry}
           userCoords={userCoords}
@@ -945,17 +1166,27 @@ export function App() {
           poskoVersion={poskoVersion}
           gempaData={gempaData}
           styleVariant={styleVariant}
+          onStyleChange={(newStyle) => setStyleVariant(newStyle as 'satelit' | 'terang' | 'gelap')}
           is3DTerrain={is3DTerrain}
+          onToggle3D={() => setIs3DTerrain((prev) => !prev)}
           layerVisibility={layerVisibility}
+          layerOpacities={layerOpacities}
+          cuacaAlerts={cuacaAlerts}
           isPickingLocation={isPickingLocationOnMap}
           onPickLocation={handleLocationPicked}
           onCoordinatesChange={(c) => setCoords(c)}
           onSelectWilayah={(id, props) => handleSelectWilayah(id, props)}
+          onPoskoClick={handlePoskoClick}
+          onJalanClick={handleJalanClick}
+          onAncamanClick={handleAncamanClick}
         />
       </main>
 
-      {/* 3. PANEL FILTER & PENCARIAN (Sisi Kiri, Collapsible) */}
-      <FilterPanel
+      {/* 3. PANEL TERPADU: WILAYAH, LAPISAN & LEGENDA (Zero Clutter & Zero Modal Collisions) */}
+      <UnifiedDrawer
+        isOpen={isUnifiedDrawerOpen}
+        onClose={() => setIsUnifiedDrawerOpen(false)}
+        initialTab={unifiedDrawerTab}
         selectedJenis={selectedJenis}
         selectedTahun={selectedTahun}
         searchQuery={searchQuery}
@@ -968,6 +1199,35 @@ export function App() {
         onSelectKota={handleSelectKota}
         onSelectKecamatan={handleSelectKecamatan}
         onResetFilter={handleResetAllFilters}
+        layerVisibility={layerVisibility}
+        onToggleLayer={(key) =>
+          setLayerVisibility((prev) => ({ ...prev, [key]: !prev[key] }))
+        }
+        onToggleAllLayers={(enableAll) => {
+          setLayerVisibility({
+            choropleth: enableAll,
+            poskoEvakuasi: enableAll,
+            shelterTes: enableAll,
+            jalanTerputus: enableAll,
+            gempa: enableAll,
+            cuaca: enableAll,
+            sesarSemangko: enableAll,
+            sesarBuffer: enableAll,
+            megathrust: enableAll,
+            zonaTsunami: enableAll,
+            tsunamiRunup: enableAll,
+          });
+        }}
+        layerOpacities={layerOpacities}
+        onOpacityChange={(key, val) =>
+          setLayerOpacities((prev) => ({ ...prev, [key]: val }))
+        }
+        onFocusLayer={(key) => {
+          if (key === 'gempa' && gempaData?.lat && gempaData?.lon) {
+            setFlyToCoords({ lat: gempaData.lat, lng: gempaData.lon, zoom: 9 });
+          }
+        }}
+        facilityCounts={facilityCounts}
       />
 
       {/* 4. PANEL DRILL-DOWN WILAYAH (Muncul Hanya Saat Ada Wilayah Dipilih) */}
@@ -1063,6 +1323,15 @@ export function App() {
         }}
       />
 
+      {/* MODAL LAPOR BENCANA WARGA (PWA CROWDSOURCING & OFFLINE STORE-FORWARD) */}
+      <CitizenReportModal
+        isOpen={isCitizenReportOpen}
+        onClose={() => setIsCitizenReportOpen(false)}
+        onReportSuccess={() => {
+          setBencanaVersion((v) => v + 1);
+        }}
+      />
+
       {/* 8. MODAL INFORMASI ARSITEKTUR & LEGENDA */}
       {showInfoPanel && (
         <aside className="absolute top-16 right-4 z-40 w-84 bg-[#1B2733]/95 backdrop-blur-xl border border-[#2D3F52] rounded-xl shadow-2xl p-4 flex flex-col gap-3 text-slate-200 animate-in slide-in-from-right duration-200">
@@ -1118,10 +1387,6 @@ export function App() {
                   <span className="text-slate-300">Shelter TES Vertikal Tsunami ({facilityCounts.tes} Gedung)</span>
                 </div>
                 <div className="flex items-center gap-2 p-1 rounded bg-[#0F1720]/50">
-                  <span className="w-3.5 h-3.5 rounded bg-[#D97706] border border-white/80 shrink-0" />
-                  <span className="text-slate-300">Sirine EWS Tsunami BPBD ({facilityCounts.sirine} Unit)</span>
-                </div>
-                <div className="flex items-center gap-2 p-1 rounded bg-[#0F1720]/50">
                   <span className="w-4 h-0.5 border-b-2 border-dashed border-rose-500 shrink-0" />
                   <span className="text-slate-300">Ruas Jalan Terputus (Blokade)</span>
                 </div>
@@ -1141,51 +1406,91 @@ export function App() {
         onClose={() => setIsSitrepModalOpen(false)}
       />
 
-      {/* 10. LAYER CONTROL PANEL (Fase 5) */}
-      <LayerControlPanel
-        isOpen={isLayerControlOpen}
-        onClose={() => setIsLayerControlOpen(false)}
+      {/* Active Layer Chips & Opacity Sliders (Top-Left under Header) */}
+      <ActiveLayerChips
         visibility={layerVisibility}
         onToggleLayer={(key) =>
-          setLayerVisibility((prev) => {
-            const nextVal = !prev[key];
-            if (key === 'gempa' && nextVal && gempaData?.lat && gempaData?.lon) {
-              setFlyToCoords({ lat: gempaData.lat, lng: gempaData.lon, zoom: 7.5 });
-            }
-            return { ...prev, [key]: nextVal };
-          })
+          setLayerVisibility((prev) => ({ ...prev, [key]: !prev[key] }))
         }
+        opacities={layerOpacities}
+        onOpacityChange={(key, val) =>
+          setLayerOpacities((prev) => ({ ...prev, [key]: val }))
+        }
+      />
+
+      {/* 7. RADAR MULTI-BAHAYA & STATUS ZONA (Terstruktur di bottom-[62px] left-4, di atas Evakuasi & di bawah Top Kerugian) */}
+      <div className="pointer-events-auto absolute bottom-[62px] left-4 z-20">
+        <button
+          type="button"
+          onClick={() => setIsRadarModalOpen(true)}
+          className={`flex items-center gap-2 px-3 py-1.5 rounded-xl backdrop-blur-xl border shadow-lg transition-all text-xs group cursor-pointer ${
+            currentProximityThreat.status === 'BAHAYA'
+              ? 'bg-rose-950/95 border-rose-500 text-rose-100 shadow-rose-950/50 hover:bg-rose-900 animate-pulse'
+              : currentProximityThreat.status === 'WASPADA'
+              ? 'bg-amber-950/95 border-amber-500 text-amber-100 shadow-amber-950/50 hover:bg-amber-900'
+              : 'bg-[#0B131D]/95 border-[#243444] text-slate-200 hover:border-sky-500 hover:bg-[#111A24]'
+          }`}
+          title="Klik untuk membuka Radar Jarak Multi-Bencana (Sesar Semangko, Galodo, Longsor, Tsunami, Posko)"
+        >
+          <span
+            className={`w-2 h-2 rounded-full shrink-0 ${
+              currentProximityThreat.status === 'BAHAYA'
+                ? 'bg-rose-500 animate-ping'
+                : currentProximityThreat.status === 'WASPADA'
+                ? 'bg-amber-400'
+                : 'bg-emerald-400'
+            }`}
+          />
+          <div className="flex items-center gap-1.5">
+            <span className="font-bold text-[11px] truncate max-w-[130px] sm:max-w-[190px]">
+              {currentProximityThreat.message}
+            </span>
+            <span
+              className={`text-[9px] font-mono px-1.5 py-0.2 rounded font-bold uppercase ${
+                currentProximityThreat.status === 'BAHAYA'
+                  ? 'bg-rose-500/30 text-rose-300'
+                  : currentProximityThreat.status === 'WASPADA'
+                  ? 'bg-amber-500/30 text-amber-300'
+                  : 'bg-emerald-500/20 text-emerald-300'
+              }`}
+            >
+              {currentProximityThreat.status}
+            </span>
+          </div>
+          <span className="text-[10px] font-mono text-sky-400 group-hover:text-sky-300 flex items-center gap-0.5 border-l border-[#1E2E40] pl-2 ml-0.5">
+            <span>Radar Jarak</span>
+            <ChevronRight className="w-3 h-3 group-hover:translate-x-0.5 transition-transform" />
+          </span>
+        </button>
+      </div>
+
+      {/* MODAL RADAR JARAK & MATRIKS BAHAYA MULTI-BENCANA */}
+      <MultiHazardRadarModal
+        isOpen={isRadarModalOpen}
+        onClose={() => setIsRadarModalOpen(false)}
+        userCoords={userCoords}
+        onPickLocationOnMap={() => {
+          setPickingTarget('evakuasi');
+          setIsPickingLocationOnMap(true);
+        }}
+        onStartRouteTo={(dest) => {
+          setPoskoCoords({ lat: dest.lat, lng: dest.lng, nama: dest.nama });
+          hitungRute(userCoords?.lat, userCoords?.lng, evakuasiModa);
+          setFlyToCoords({ lat: dest.lat, lng: dest.lng, zoom: 14 });
+        }}
+        bencanaList={radarBencanaList}
+        poskoList={radarPoskoList}
+        jalanList={radarJalanList}
+      />
+
+      {/* Floating Real-Time Seismic Card (Bottom-Right Quadrant) */}
+      <FloatingSeismicCard
         gempaData={gempaData}
-        onFocusGempa={() => {
-          if (gempaData?.lat && gempaData?.lon) {
-            setLayerVisibility((prev) => ({ ...prev, gempa: true }));
-            setFlyToCoords({ lat: gempaData.lat, lng: gempaData.lon, zoom: 7.5 });
-            setIsLayerControlOpen(false);
-          }
+        distanceToSumbar={distanceToSumbar}
+        onFocus={(coords) => {
+          setLayerVisibility((prev) => ({ ...prev, gempa: true }));
+          setFlyToCoords({ lat: coords.lat, lng: coords.lon, zoom: coords.zoom || 8.5 });
         }}
-        onToggleAll={(enable) => {
-          setLayerVisibility({
-            choropleth: enable,
-            poskoEvakuasi: enable,
-            shelterTes: enable,
-            sirineTsunami: enable,
-            jalanTerputus: enable,
-            gempa: enable,
-            cuaca: enable,
-            sesarSemangko: enable,
-            sesarBuffer: enable,
-            megathrust: enable,
-            zonaTsunami: enable,
-            tsunamiRunup: enable,
-          });
-          if (!enable) {
-            setSelectedWilayahId(null);
-            setWilayahDampak(null);
-          }
-        }}
-        tesCount={facilityCounts.tes}
-        sirineCount={facilityCounts.sirine}
-        poskoCount={facilityCounts.posko}
       />
 
       {/* 11. MODAL DETAIL PERINGATAN CUACA BMKG & GALODO */}
@@ -1214,6 +1519,46 @@ export function App() {
           setFlyToCoords({ lat: loc.lat, lng: loc.lng, zoom: 15.5 });
         }}
       />
+
+      {/* 12b. INTERACTIVE BOTTOM SHEETS (TOUCHSCREEN LAPANGAN) */}
+      <DetailPoskoSheet
+        posko={selectedPoskoSheet}
+        onClose={() => setSelectedPoskoSheet(null)}
+        onNavigateToPosko={(posko) => {
+          setSelectedPoskoSheet(null);
+          setPoskoCoords({ lat: posko.lat, lng: posko.lon, nama: posko.nama });
+          setIsEvakuasiModalOpen(true);
+        }}
+      />
+
+      <DetailJalanSheet
+        jalan={selectedJalanSheet}
+        onClose={() => setSelectedJalanSheet(null)}
+        onPlanDetour={() => {
+          setSelectedJalanSheet(null);
+          setIsEvakuasiModalOpen(true);
+        }}
+      />
+
+      <DetailAncamanSheet
+        data={selectedAncamanSheet}
+        onClose={() => setSelectedAncamanSheet(null)}
+        onMulaiEvakuasi={() => {
+          setSelectedAncamanSheet(null);
+          setIsEvakuasiModalOpen(true);
+        }}
+      />
+
+      {/* Modal Aksesibilitas Posko Evakuasi Semantik (WCAG 2.1 AA) */}
+      <AccessibleShelterModal
+        isOpen={isAccessibleModalOpen}
+        onClose={() => setIsAccessibleModalOpen(false)}
+        onSelectPosko={(posko) => {
+          setFlyToCoords({ lat: posko.lat, lng: posko.lon, zoom: 16 });
+        }}
+      />
+
+
 
       {/* 13. BOTTOM BAR (Aksi Utama Evakuasi & Telemetri Realtime) */}
       <footer className="absolute bottom-3 left-4 right-4 z-20 pointer-events-none flex items-center justify-between gap-4">

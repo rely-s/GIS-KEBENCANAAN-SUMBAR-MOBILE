@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Response, Request
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, or_
 from pydantic import BaseModel
 from typing import Optional
 
@@ -35,7 +35,14 @@ async def login(
     response: Response,
     db: AsyncSession = Depends(get_async_db)
 ):
-    result = await db.execute(select(Pengguna).where(Pengguna.email == payload.email))
+    clean_ident = payload.email.strip().lower()
+    stmt = select(Pengguna).where(
+        or_(
+            Pengguna.email == clean_ident,
+            Pengguna.email == f"{clean_ident}@sumbarprov.go.id"
+        )
+    )
+    result = await db.execute(stmt)
     user = result.scalar_one_or_none()
 
     if not user or not verify_password(payload.password, user.password_hash):

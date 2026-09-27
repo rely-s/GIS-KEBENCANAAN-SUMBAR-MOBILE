@@ -11,10 +11,11 @@ router = APIRouter(prefix="/admin", tags=["Administrasi & Eksekutif Pimpinan"])
 
 @router.get("/pengguna")
 async def list_pengguna(
+    current_user: Pengguna = Depends(require_role(["admin", "super_admin"])),
     db: AsyncSession = Depends(get_async_db)
 ):
     """
-    Admin: Mengembalikan daftar seluruh akun pengguna sistem dan hak aksesnya.
+    Khusus Admin & Super Admin: Mengembalikan daftar seluruh akun pengguna sistem dan hak aksesnya.
     """
     query = text("""
         SELECT 
@@ -41,9 +42,12 @@ async def list_pengguna(
     return {"data": users}
 
 @router.get("/statistik")
-async def get_ringkasan_eksekutif(db: AsyncSession = Depends(get_async_db)):
+async def get_ringkasan_eksekutif(
+    current_user: Pengguna = Depends(require_role(["pimpinan", "admin", "operator"])),
+    db: AsyncSession = Depends(get_async_db)
+):
     """
-    Pimpinan & Admin: Mengembalikan agregasi statistik makro untuk Ringkasan Eksekutif BPBD.
+    Khusus Pimpinan & Petugas: Mengembalikan agregasi statistik makro untuk Ringkasan Eksekutif BPBD.
     """
     # 1. Total Dampak & Kerugian
     dampak_q = text("""
@@ -119,7 +123,7 @@ async def get_verifikasi_queue(
     bencana_q = text("""
         SELECT 
             k.id, k.jenis_bencana, k.tanggal_kejadian, k.deskripsi, k.status_verifikasi,
-            k.sumber_data, w.nama AS wilayah_nama, p.nama AS pelapor_nama,
+            k.sumber_data, k.foto_url, w.nama AS wilayah_nama, p.nama AS pelapor_nama,
             COALESCE(ST_X(k.lokasi), 0) AS lon, COALESCE(ST_Y(k.lokasi), 0) AS lat
         FROM kejadian_bencana k
         LEFT JOIN wilayah_administratif w ON w.id = k.wilayah_id
@@ -141,6 +145,7 @@ async def get_verifikasi_queue(
             "sumber_data": r.sumber_data,
             "pelapor": r.pelapor_nama or "Petugas Lapangan",
             "status": r.status_verifikasi,
+            "foto_url": r.foto_url,
             "lat": float(r.lat) if r.lat != 0 else None,
             "lon": float(r.lon) if r.lon != 0 else None,
         })

@@ -52,7 +52,8 @@ async def get_current_user(
 
 def require_role(allowed_roles: List[str]):
     async def role_checker(user: Pengguna = Depends(get_current_user)) -> Pengguna:
-        if user.role not in allowed_roles:
+        # Peran super_admin memiliki izin mutlak menyeluruh ke semua endpoint
+        if user.role != "super_admin" and user.role not in allowed_roles:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail={

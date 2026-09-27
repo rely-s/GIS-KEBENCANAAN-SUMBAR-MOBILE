@@ -26,7 +26,7 @@ export const StatistikChart: React.FC<StatistikChartProps> = ({
 }) => {
   const chartRef = useRef<HTMLDivElement>(null);
   const chartInstance = useRef<echarts.ECharts | null>(null);
-  const [isCollapsed, setIsCollapsed] = useState(false);
+  const [isCollapsed, setIsCollapsed] = useState(true);
 
   // Urutkan data berdasarkan total kerugian terbesar (Top 10 untuk kejelasan visual)
   const topData: KecamatanStatItem[] = useMemo(() => {
@@ -239,18 +239,18 @@ export const StatistikChart: React.FC<StatistikChartProps> = ({
 
   return (
     <div
-      className={`absolute bottom-16 left-4 z-20 bg-[#1B2733]/95 backdrop-blur-xl border border-[#2D3F52] rounded-xl shadow-2xl text-slate-100 transition-all duration-300 overflow-hidden ${
-        isCollapsed ? 'w-64 h-11' : 'w-88 sm:w-96 h-76'
+      className={`absolute bottom-[108px] left-4 z-20 bg-[#0B131D]/95 backdrop-blur-xl border border-[#243444] rounded-xl shadow-2xl text-slate-100 transition-all duration-300 overflow-hidden ${
+        isCollapsed ? 'w-56 h-9' : 'w-88 sm:w-96 h-72'
       }`}
     >
       {/* Header Bar */}
-      <div className="h-11 px-3.5 border-b border-[#2D3F52] bg-[#0F1720]/60 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <BarChart3 className="w-4 h-4 text-amber-400" />
-          <h3 className="text-xs font-bold font-display tracking-wider uppercase text-slate-200">
+      <div className="h-9 px-3 border-b border-[#1E2E40] bg-[#0E1825]/90 flex items-center justify-between">
+        <div className="flex items-center gap-1.5 min-w-0">
+          <BarChart3 className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+          <h3 className="text-[11px] font-bold font-display tracking-wider uppercase text-slate-200 truncate">
             Top Kerugian Wilayah
           </h3>
-          <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-[#1E3A5F] text-blue-200 border border-[#3A5A82]/50">
+          <span className="text-[9px] font-mono px-1 py-0.2 rounded bg-sky-950/60 text-sky-300 border border-sky-800/40 shrink-0">
             ECharts
           </span>
         </div>
@@ -258,10 +258,10 @@ export const StatistikChart: React.FC<StatistikChartProps> = ({
         <div className="flex items-center gap-1">
           <button
             onClick={() => setIsCollapsed(!isCollapsed)}
-            className="p-1 rounded text-slate-400 hover:text-white hover:bg-[#2D3F52] transition-colors"
-            title={isCollapsed ? 'Perbesar Grafik' : 'Perkecil Grafik'}
+            className="p-1 rounded text-slate-400 hover:text-white hover:bg-[#1E2E40] transition-colors cursor-pointer"
+            title={isCollapsed ? 'Buka Grafik Analitik' : 'Lipat Grafik'}
           >
-            {isCollapsed ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+            {isCollapsed ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
           </button>
         </div>
       </div>

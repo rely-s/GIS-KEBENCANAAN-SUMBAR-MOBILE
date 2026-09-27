@@ -16,7 +16,6 @@ import {
   Info,
   Navigation,
   MapPin,
-  Radio,
   Heart,
   AlertCircle,
   ChevronRight
@@ -192,8 +191,6 @@ export const WilayahPanel: React.FC<WilayahPanelProps> = ({
     switch ((jenis || '').toLowerCase()) {
       case 'shelter_tes_tea':
         return <Building2 className="w-4 h-4 text-sky-400" />;
-      case 'sirine_tsunami':
-        return <Radio className="w-4 h-4 text-amber-400" />;
       case 'fasilitas_kesehatan':
         return <Heart className="w-4 h-4 text-emerald-400" />;
       default:
@@ -204,7 +201,6 @@ export const WilayahPanel: React.FC<WilayahPanelProps> = ({
   const getFasilitasLabel = (jenis: string) => {
     switch ((jenis || '').toLowerCase()) {
       case 'shelter_tes_tea': return 'Shelter TES Tsunami';
-      case 'sirine_tsunami': return 'Sirine EWS BPBD';
       case 'fasilitas_kesehatan': return 'Posko Medis & Faskes';
       default: return 'Posko Pengungsi';
     }
@@ -213,7 +209,6 @@ export const WilayahPanel: React.FC<WilayahPanelProps> = ({
   const getFasilitasColor = (jenis: string) => {
     switch ((jenis || '').toLowerCase()) {
       case 'shelter_tes_tea': return 'border-sky-500/40 bg-sky-950/30';
-      case 'sirine_tsunami': return 'border-amber-500/40 bg-amber-950/20';
       case 'fasilitas_kesehatan': return 'border-emerald-500/40 bg-emerald-950/20';
       default: return 'border-orange-500/40 bg-orange-950/20';
     }
@@ -264,35 +259,35 @@ export const WilayahPanel: React.FC<WilayahPanelProps> = ({
     return 'Wilayah Administrasi';
   };
 
-  // Posko terdekat (prioritas bukan sirine)
+  // Posko terdekat
   const poskoUtama = fasilitasTerdekat.find(
-    (f) => f.jenis !== 'sirine_tsunami' && f.lat && f.lon
+    (f) => f.lat && f.lon
   ) || fasilitasTerdekat[0];
 
   return (
     <aside 
-      className="absolute top-16 right-4 z-30 w-full max-w-[calc(100vw-2rem)] sm:w-96 max-h-[calc(100vh-5.5rem)] bg-[#1B2733]/95 backdrop-blur-xl border border-[#2D3F52] rounded-xl shadow-2xl flex flex-col text-slate-100 animate-in slide-in-from-right duration-250 ease-out overflow-hidden"
+      className="absolute top-20 right-4 z-30 w-full max-w-[calc(100vw-2rem)] sm:w-[420px] max-h-[calc(100vh-6rem)] bg-[#1B2733]/95 backdrop-blur-2xl border-2 border-[#2D3F52] rounded-2xl shadow-2xl flex flex-col text-slate-100 animate-in slide-in-from-right duration-250 ease-out overflow-hidden"
       aria-label="Panel Data Dampak Wilayah"
       onClick={(e) => e.stopPropagation()}
     >
       {/* 1. Header Panel */}
-      <div className="p-4 border-b border-[#2D3F52] bg-[#0F1720]/60 flex items-start justify-between">
+      <div className="p-4 sm:p-5 border-b border-[#2D3F52] bg-[#0F1720]/80 flex items-start justify-between">
         <div>
-          <div className="flex items-center gap-2 mb-1">
-            <span className="text-[10px] font-mono uppercase tracking-wider text-slate-400">
+          <div className="flex items-center gap-2 mb-1.5">
+            <span className="text-xs font-mono uppercase tracking-wider text-slate-300 font-bold">
               {getAdminLevelLabel()}
             </span>
             {data && getRiskBadge(data.tingkat_risiko)}
           </div>
-          <h2 className="text-lg font-bold font-display text-white tracking-tight">
+          <h2 className="text-xl font-black font-display text-white tracking-tight">
             {data?.nama || 'Memuat Wilayah...'}
           </h2>
-          <p className="text-xs text-slate-400">
+          <p className="text-sm text-slate-300 font-medium">
             {data?.parent_nama || 'Provinsi Sumatera Barat'}
           </p>
         </div>
 
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-2">
           {onFocusRegion && (
             <button
               type="button"
@@ -302,9 +297,9 @@ export const WilayahPanel: React.FC<WilayahPanelProps> = ({
               }}
               title="Pusatkan peta ke wilayah ini"
               aria-label="Pusatkan peta ke wilayah ini"
-              className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-[#2D3F52] transition-colors cursor-pointer"
+              className="p-2 rounded-xl text-slate-300 hover:text-white hover:bg-[#2D3F52] transition-colors cursor-pointer"
             >
-              <Crosshair className="w-4 h-4" />
+              <Crosshair className="w-5 h-5" />
             </button>
           )}
           <button
@@ -315,57 +310,54 @@ export const WilayahPanel: React.FC<WilayahPanelProps> = ({
             }}
             title="Tutup panel (Esc)"
             aria-label="Tutup panel data wilayah"
-            className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-[#2D3F52] focus:outline-none focus:ring-2 focus:ring-amber-400/50 transition-colors cursor-pointer"
+            className="p-2 rounded-xl text-slate-300 hover:text-white hover:bg-[#2D3F52] focus:outline-none focus:ring-2 focus:ring-amber-400/50 transition-colors cursor-pointer"
           >
-            <X className="w-4 h-4" />
+            <X className="w-5 h-5" />
           </button>
         </div>
       </div>
 
       {/* 2. Loading State */}
       {loading && (
-        <div className="p-6 flex flex-col items-center justify-center gap-3 text-slate-400">
-          <div className="w-6 h-6 border-2 border-amber-400 border-t-transparent rounded-full animate-spin" />
-          <p className="text-xs font-mono">Mengambil agregasi data dampak...</p>
+        <div className="p-8 flex flex-col items-center justify-center gap-3 text-slate-300">
+          <div className="w-8 h-8 border-3 border-amber-400 border-t-transparent rounded-full animate-spin" />
+          <p className="text-sm font-mono font-bold">Mengambil agregasi data dampak...</p>
         </div>
       )}
 
       {/* 3. Konten Data Dampak */}
       {!loading && data && (
-        <div className="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar">
+        <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-4 custom-scrollbar">
           {/* Card Utama: Total Kerugian Finansial */}
-          <div className="p-3.5 rounded-xl bg-gradient-to-br from-[#1E3A5F]/60 to-[#0F1720]/80 border border-[#3A5A82]/50 shadow-inner">
-            <div className="flex items-center justify-between text-slate-400 text-xs mb-1">
-              <span className="flex items-center gap-1.5 font-medium">
-                <TrendingUp className="w-3.5 h-3.5 text-amber-400" />
+          <div className="p-4 rounded-2xl bg-gradient-to-br from-[#1E3A5F]/70 to-[#0F1720]/90 border border-[#3A5A82]/60 shadow-inner">
+            <div className="flex items-center justify-between text-slate-300 text-xs sm:text-sm mb-1.5 font-semibold">
+              <span className="flex items-center gap-1.5">
+                <TrendingUp className="w-4 h-4 text-amber-400" />
                 Estimasi Total Kerugian
               </span>
-              <span className="text-[11px] font-mono text-slate-400">
+              <span className="font-mono text-slate-300">
                 {safeInt(data.jumlah_kejadian)} Kejadian
               </span>
             </div>
-            <div className="text-xl font-bold font-display tracking-tight text-amber-300">
+            <div className="text-2xl sm:text-3xl font-black font-display tracking-tight text-amber-300">
               {formatRupiah(data.total_kerugian)}
             </div>
-            <div className="text-[10px] text-slate-400 font-mono mt-0.5">
+            <div className="text-xs text-slate-400 font-mono mt-1 font-medium">
               Rp {safeInt(data.total_kerugian).toLocaleString('id-ID')}
             </div>
           </div>
 
           {/* Konteks Agregasi Wilayah Induk (Jika data lokal kecamatan belum terperinci) */}
           {data.jumlah_kejadian === 0 && data.parent_dampak && (
-            <div className="p-3 rounded-xl bg-sky-950/40 border border-sky-500/30 text-xs space-y-2">
-              <div className="flex items-start gap-2">
-                <Info className="w-4 h-4 text-sky-400 shrink-0 mt-0.5" />
+            <div className="p-4 rounded-2xl bg-sky-950/50 border border-sky-500/40 text-xs sm:text-sm space-y-2">
+              <div className="flex items-start gap-2.5">
+                <Info className="w-5 h-5 text-sky-400 shrink-0 mt-0.5" />
                 <div className="space-y-1">
-                  <div className="font-semibold text-sky-200">
+                  <div className="font-bold text-sky-200">
                     Konteks Wilayah Induk: {data.parent_dampak.nama_wilayah || (data.parent_dampak as any).parent_nama || data.parent_nama || 'Kabupaten/Kota Induk'}
                   </div>
-                  <p className="text-[11px] text-slate-300 leading-relaxed">
+                  <p className="text-xs sm:text-sm text-slate-200 leading-relaxed">
                     Data historis agregat {(data.parent_dampak.tingkat || 'kabupaten').toLowerCase()} mencatat <b>{data.parent_dampak.jumlah_kejadian || 1} kejadian</b> dengan total <b>{safeInt(data.parent_dampak.total_meninggal)} korban jiwa</b> dan <b>{safeInt(data.parent_dampak.jumlah_pengungsi || (data.parent_dampak as any).total_pengungsi).toLocaleString('id-ID')} pengungsi</b> ({formatRupiah(data.parent_dampak.total_kerugian)}).
-                  </p>
-                  <p className="text-[10px] text-slate-400 italic">
-                    *Kecamatan ini tidak memiliki catatan dampak individu terpisah dalam basis data BNPB/BPBD.
                   </p>
                 </div>
               </div>
@@ -373,62 +365,62 @@ export const WilayahPanel: React.FC<WilayahPanelProps> = ({
           )}
 
           {/* Grid Metrik Korban Manusia */}
-          <div className="space-y-1.5">
-            <h3 className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
-              <Users className="w-3.5 h-3.5 text-slate-400" />
+          <div className="space-y-2">
+            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-1.5 font-mono">
+              <Users className="w-4 h-4 text-slate-300" />
               Dampak Terhadap Masyarakat
             </h3>
-            <div className="grid grid-cols-3 gap-2">
-              <div className="p-2.5 rounded-lg bg-[#0F1720]/70 border border-[#2D3F52] text-center">
-                <span className="text-[10px] uppercase font-mono text-slate-400 block mb-0.5">Meninggal</span>
-                <span className={`text-base font-bold font-display ${safeInt(data.total_meninggal) > 0 ? 'text-red-400' : 'text-slate-300'}`}>
+            <div className="grid grid-cols-3 gap-2.5">
+              <div className="p-3 rounded-xl bg-[#0F1720]/80 border border-[#2D3F52] text-center">
+                <span className="text-xs uppercase font-mono font-bold text-slate-400 block mb-1">Meninggal</span>
+                <span className={`text-xl font-black font-display ${safeInt(data.total_meninggal) > 0 ? 'text-red-400' : 'text-slate-300'}`}>
                   {safeInt(data.total_meninggal)}
                 </span>
-                <span className="text-[10px] text-slate-500 block">jiwa</span>
+                <span className="text-xs text-slate-400 block mt-0.5">jiwa</span>
               </div>
-              <div className="p-2.5 rounded-lg bg-[#0F1720]/70 border border-[#2D3F52] text-center">
-                <span className="text-[10px] uppercase font-mono text-slate-400 block mb-0.5">Luka-luka</span>
-                <span className={`text-base font-bold font-display ${safeInt(data.total_luka) > 0 ? 'text-amber-400' : 'text-slate-300'}`}>
+              <div className="p-3 rounded-xl bg-[#0F1720]/80 border border-[#2D3F52] text-center">
+                <span className="text-xs uppercase font-mono font-bold text-slate-400 block mb-1">Luka-luka</span>
+                <span className={`text-xl font-black font-display ${safeInt(data.total_luka) > 0 ? 'text-amber-400' : 'text-slate-300'}`}>
                   {safeInt(data.total_luka)}
                 </span>
-                <span className="text-[10px] text-slate-500 block">orang</span>
+                <span className="text-xs text-slate-400 block mt-0.5">orang</span>
               </div>
-              <div className="p-2.5 rounded-lg bg-[#0F1720]/70 border border-[#2D3F52] text-center">
-                <span className="text-[10px] uppercase font-mono text-slate-400 block mb-0.5">Pengungsi</span>
-                <span className="text-base font-bold font-display text-blue-300">
+              <div className="p-3 rounded-xl bg-[#0F1720]/80 border border-[#2D3F52] text-center">
+                <span className="text-xs uppercase font-mono font-bold text-slate-400 block mb-1">Pengungsi</span>
+                <span className="text-xl font-black font-display text-blue-300">
                   {safeInt(data.jumlah_pengungsi).toLocaleString('id-ID')}
                 </span>
-                <span className="text-[10px] text-slate-500 block">jiwa</span>
+                <span className="text-xs text-slate-400 block mt-0.5">jiwa</span>
               </div>
             </div>
           </div>
 
           {/* Kerusakan Rumah & Fasilitas Publik */}
-          <div className="space-y-1.5">
-            <h3 className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
-              <Building2 className="w-3.5 h-3.5 text-slate-400" />
-              Kerusakan Infrastruktur & Fasilitas
+          <div className="space-y-2">
+            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-1.5 font-mono">
+              <Building2 className="w-4 h-4 text-slate-300" />
+              Kerusakan Infrastruktur &amp; Fasilitas
             </h3>
-            <div className="p-3 rounded-xl bg-[#0F1720]/60 border border-[#2D3F52] space-y-2 text-xs">
-              <div className="flex justify-between items-center pb-1.5 border-b border-[#2D3F52]/60">
-                <span className="text-slate-300">Rumah Rusak Berat (RB)</span>
-                <span className="font-mono font-semibold text-red-400">{safeInt(data.rumah_rusak_berat)} unit</span>
+            <div className="p-4 rounded-2xl bg-[#0F1720]/80 border border-[#2D3F52] space-y-2.5 text-sm">
+              <div className="flex justify-between items-center pb-2 border-b border-[#2D3F52]/60">
+                <span className="text-slate-200 font-medium">Rumah Rusak Berat (RB)</span>
+                <span className="font-mono font-bold text-red-400 text-base">{safeInt(data.rumah_rusak_berat)} unit</span>
               </div>
-              <div className="flex justify-between items-center pb-1.5 border-b border-[#2D3F52]/60">
-                <span className="text-slate-300">Rumah Rusak Sedang (RS)</span>
-                <span className="font-mono font-semibold text-amber-400">{safeInt(data.rumah_rusak_sedang)} unit</span>
+              <div className="flex justify-between items-center pb-2 border-b border-[#2D3F52]/60">
+                <span className="text-slate-200 font-medium">Rumah Rusak Sedang (RS)</span>
+                <span className="font-mono font-bold text-amber-400 text-base">{safeInt(data.rumah_rusak_sedang)} unit</span>
               </div>
-              <div className="flex justify-between items-center pb-1.5 border-b border-[#2D3F52]/60">
-                <span className="text-slate-300">Rumah Rusak Ringan (RR)</span>
-                <span className="font-mono font-semibold text-slate-300">{safeInt(data.rumah_rusak_ringan)} unit</span>
+              <div className="flex justify-between items-center pb-2 border-b border-[#2D3F52]/60">
+                <span className="text-slate-200 font-medium">Rumah Rusak Ringan (RR)</span>
+                <span className="font-mono font-bold text-slate-200 text-base">{safeInt(data.rumah_rusak_ringan)} unit</span>
               </div>
-              <div className="flex justify-between items-center pb-1.5 border-b border-[#2D3F52]/60">
-                <span className="text-slate-300">Fasilitas Umum Rusak</span>
-                <span className="font-mono font-semibold text-slate-200">{safeInt(data.fasilitas_umum_rusak)} titik</span>
+              <div className="flex justify-between items-center pb-2 border-b border-[#2D3F52]/60">
+                <span className="text-slate-200 font-medium">Fasilitas Umum Rusak</span>
+                <span className="font-mono font-bold text-slate-100 text-base">{safeInt(data.fasilitas_umum_rusak)} titik</span>
               </div>
               <div className="flex justify-between items-center">
-                <span className="text-slate-300">Fasilitas Kesehatan / Sekolah</span>
-                <span className="font-mono font-semibold text-slate-200">
+                <span className="text-slate-200 font-medium">Fasilitas Kesehatan / Sekolah</span>
+                <span className="font-mono font-bold text-slate-100 text-base">
                   {safeInt(data.fasilitas_kesehatan_rusak) + safeInt(data.sekolah_rusak)} unit
                 </span>
               </div>
@@ -476,11 +468,6 @@ export const WilayahPanel: React.FC<WilayahPanelProps> = ({
                         {f.kapasitas && (
                           <span className="text-slate-500">• {f.kapasitas.toLocaleString('id-ID')} jiwa</span>
                         )}
-                        {f.status && f.jenis === 'sirine_tsunami' && (
-                          <span className={`font-semibold ${f.status === 'aktif' ? 'text-amber-400' : 'text-slate-500'}`}>
-                            • {f.status === 'aktif' ? 'Siaga' : 'Maint'}
-                          </span>
-                        )}
                       </div>
                       {f.jarak_meter && (
                         <div className="text-[10px] text-emerald-400 font-mono mt-0.5">
@@ -488,7 +475,7 @@ export const WilayahPanel: React.FC<WilayahPanelProps> = ({
                         </div>
                       )}
                     </div>
-                    {onStartEvakuasiRoute && f.lat && f.lon && f.jenis !== 'sirine_tsunami' && (
+                    {onStartEvakuasiRoute && f.lat && f.lon && (
                       <button
                         type="button"
                         onClick={(e) => {

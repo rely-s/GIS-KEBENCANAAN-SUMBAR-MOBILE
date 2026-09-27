@@ -1,22 +1,27 @@
 import React, { useState, useEffect } from 'react';
 import { 
-  Compass, 
   Waves, 
   AlertTriangle, 
   Navigation, 
   Crosshair, 
   X, 
   ShieldCheck, 
-  Info, 
   Radio, 
   RefreshCw,
   MapPin,
-  Bot
+  Bot,
+  Activity,
+  Flame,
+  CloudRain,
+  ChevronRight,
+  ShieldAlert
 } from 'lucide-react';
 import { DisasterChatbot } from '../bot/DisasterChatbot';
 
+export type MultiHazardType = 'tsunami' | 'galodo' | 'sesar' | 'erupsi';
+
 export interface EvakuasiStartParams {
-  jenis_bencana: 'tsunami' | 'non_tsunami' | string;
+  jenis_bencana: MultiHazardType | string;
   kecamatan_id?: number | string;
   kecamatan_nama?: string;
   lat?: number;
@@ -36,6 +41,75 @@ interface EvakuasiModalProps {
   onSelectDestination?: (loc: { lat: number; lng: number; nama: string }) => void;
 }
 
+interface HazardProtocolMeta {
+  id: MultiHazardType;
+  label: string;
+  subLabel: string;
+  protokolCode: string;
+  icon: React.ComponentType<{ className?: string }>;
+  accentColor: string;
+  borderColor: string;
+  bgColor: string;
+  ringColor: string;
+  pedoman: string;
+  larangan: string;
+}
+
+const HAZARD_PROTOCOLS: HazardProtocolMeta[] = [
+  {
+    id: 'tsunami',
+    label: 'Tsunami Megathrust',
+    subLabel: 'Pesisir Barat & Kep. Mentawai',
+    protokolCode: 'PROTOKOL 1 — TSUNAMI',
+    icon: Waves,
+    accentColor: 'text-rose-400',
+    borderColor: 'border-rose-500/80',
+    bgColor: 'bg-rose-950/40',
+    ringColor: 'ring-rose-500/40',
+    pedoman: 'Prioritas Shelter Vertikal TES (Lantai 3+) atau dataran timur Garis Bypass (> 15 mdpl).',
+    larangan: 'Jangan bertahan di pantai atau gedung non-seismik 1 lantai.'
+  },
+  {
+    id: 'galodo',
+    label: 'Banjir Lahar / Galodo',
+    subLabel: 'Gunung Marapi & Koridor Aliran',
+    protokolCode: 'PROTOKOL 2 — GALODO',
+    icon: CloudRain,
+    accentColor: 'text-amber-400',
+    borderColor: 'border-amber-500/80',
+    bgColor: 'bg-amber-950/40',
+    ringColor: 'ring-amber-500/40',
+    pedoman: 'Bergerak tegak lurus lembah sungai menuju punggung bukit terdekat.',
+    larangan: 'DILARANG menyeberangi jembatan atau berada di dekat sempadan sungai lahar!'
+  },
+  {
+    id: 'sesar',
+    label: 'Gempa Sesar Darat',
+    subLabel: 'Sesar Semangko / Sianok / Sumani',
+    protokolCode: 'PROTOKOL 3 — SESAR',
+    icon: Activity,
+    accentColor: 'text-orange-400',
+    borderColor: 'border-orange-500/80',
+    bgColor: 'bg-orange-950/40',
+    ringColor: 'ring-orange-500/40',
+    pedoman: 'Evakuasi menuju ruang terbuka (lapangan/alun-alun/stadion terbuka).',
+    larangan: 'Hindari shelter bertingkat tinggi dan jauhi tebing curam (Ngarai Sianok).'
+  },
+  {
+    id: 'erupsi',
+    label: 'Erupsi Gunung Api',
+    subLabel: 'Gunung Marapi / PVMBG Radius 4.5 km',
+    protokolCode: 'PROTOKOL 4 — ERUPSI',
+    icon: Flame,
+    accentColor: 'text-red-400',
+    borderColor: 'border-red-500/80',
+    bgColor: 'bg-red-950/40',
+    ringColor: 'ring-red-500/40',
+    pedoman: 'Jauhi radius 4.5 km dari kaldera kawah aktif. Kenakan masker penutup abu.',
+    larangan: 'Jangan beraktivitas di lembah sungai hulu lahar saat hujan di puncak.'
+  }
+];
+
 export const EvakuasiModal: React.FC<EvakuasiModalProps> = ({
   isOpen,
   onClose,
@@ -48,10 +122,17 @@ export const EvakuasiModal: React.FC<EvakuasiModalProps> = ({
   onSelectDestination
 }) => {
   const [activeTab, setActiveTab] = useState<'rute' | 'asisten'>('rute');
-  // 1. Jenis Bencana: HANYA ADA DUA (Tsunami vs Non-Tsunami)
-  const [jenisBencana, setJenisBencana] = useState<'tsunami' | 'non_tsunami'>(
-    defaultJenisBencana.toLowerCase().includes('tsunami') ? 'tsunami' : 'non_tsunami'
-  );
+  
+  // 4 Protokol Multi-Hazard Spesifik BNPB
+  const resolveInitialHazard = (): MultiHazardType => {
+    const lower = defaultJenisBencana.toLowerCase();
+    if (lower.includes('galodo') || lower.includes('lahar') || lower.includes('bandang')) return 'galodo';
+    if (lower.includes('sesar') || lower.includes('gempa') || lower.includes('semangko')) return 'sesar';
+    if (lower.includes('erupsi') || lower.includes('vulkanik')) return 'erupsi';
+    return 'tsunami';
+  };
+
+  const [selectedHazard, setSelectedHazard] = useState<MultiHazardType>(resolveInitialHazard);
   const [bencanaAktifInfo, setBencanaAktifInfo] = useState<any>(null);
 
   // 2. Lokasi Pengguna
@@ -65,31 +146,33 @@ export const EvakuasiModal: React.FC<EvakuasiModalProps> = ({
   // 3. Moda Transportasi
   const [selectedModa, setSelectedModa] = useState<'mobil' | 'jalan_kaki'>('mobil');
 
-  // Klasifikasi Alur: Tsunami -> Alur A, Non-Tsunami -> Alur B
-  const isAlurA = jenisBencana === 'tsunami';
+  // Sinkronisasi koordinat kursor peta jika berubah di props
+  useEffect(() => {
+    if (userCoords) {
+      setActiveCoords({ lat: userCoords.lat, lon: userCoords.lng });
+    }
+  }, [userCoords]);
 
   // Periksa sensor bencana aktif BMKG saat modal terbuka
   useEffect(() => {
     if (isOpen) {
-      if (userCoords) {
-        setActiveCoords({ lat: userCoords.lat, lon: userCoords.lng });
-      }
-
       fetch('/api/routing/bencana-aktif')
         .then((res) => (res.ok ? res.json() : null))
         .then((data) => {
           if (data) {
             setBencanaAktifInfo(data);
             if (data.status_siaga === 'BAHAYA_TSUNAMI') {
-              setJenisBencana('tsunami');
-            } else if (data.status_siaga === 'SIAGA_GALODO' || data.status_siaga === 'WASPADA') {
-              setJenisBencana('non_tsunami');
+              setSelectedHazard('tsunami');
+            } else if (data.status_siaga === 'SIAGA_GALODO') {
+              setSelectedHazard('galodo');
+            } else if (data.status_siaga === 'WASPADA_GEMPA_SESAR') {
+              setSelectedHazard('sesar');
             }
           }
         })
         .catch(() => {});
     }
-  }, [isOpen, userCoords]);
+  }, [isOpen]);
 
   // Handler Deteksi GPS Otomatis
   const handleUseGps = () => {
@@ -131,7 +214,7 @@ export const EvakuasiModal: React.FC<EvakuasiModalProps> = ({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     onStartEvakuasi({
-      jenis_bencana: jenisBencana,
+      jenis_bencana: selectedHazard,
       lat: activeCoords?.lat,
       lon: activeCoords?.lon,
       moda: selectedModa,
@@ -139,12 +222,14 @@ export const EvakuasiModal: React.FC<EvakuasiModalProps> = ({
     });
   };
 
+  const activeMeta = HAZARD_PROTOCOLS.find((h) => h.id === selectedHazard) || HAZARD_PROTOCOLS[0];
+
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/75 backdrop-blur-md animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200">
       <div 
-        className="w-full max-w-xl bg-[#0B131D]/98 border border-[#273B4F] rounded-2xl shadow-2xl overflow-hidden flex flex-col text-slate-100 max-h-[92vh]"
+        className="w-full max-w-2xl bg-[#0B131D]/98 border border-[#273B4F] rounded-2xl shadow-2xl overflow-hidden flex flex-col text-slate-100 max-h-[94vh]"
         role="dialog"
         aria-modal="true"
         aria-labelledby="evakuasi-modal-title"
@@ -152,31 +237,23 @@ export const EvakuasiModal: React.FC<EvakuasiModalProps> = ({
         {/* Header Dialog */}
         <div className="p-4 sm:p-5 bg-gradient-to-r from-[#172331] via-[#0E1722] to-[#0B131D] border-b border-[#233547] flex items-start justify-between relative">
           <div className="flex items-start gap-3">
-            <div className={`p-2.5 rounded-xl border shrink-0 ${
-              isAlurA 
-                ? 'bg-rose-500/20 border-rose-500/40 text-rose-400' 
-                : 'bg-amber-500/20 border-amber-500/40 text-amber-400'
-            }`}>
-              <Compass className="w-5 h-5 animate-spin-slow" />
+            <div className={`p-2.5 rounded-xl border shrink-0 ${activeMeta.bgColor} ${activeMeta.borderColor} ${activeMeta.accentColor}`}>
+              <activeMeta.icon className="w-5 h-5 animate-pulse" />
             </div>
             <div>
               <div className="flex items-center gap-2 flex-wrap">
                 <span className="text-[10px] font-mono uppercase tracking-widest px-2 py-0.5 rounded bg-black/40 text-slate-300 border border-slate-700 font-bold">
-                  SISTEM TANGGAP DARURAT RESMI
+                  SISTEM NAVIGASI EVAKUASI RESMI
                 </span>
-                <span className={`text-[10px] font-mono uppercase tracking-widest px-2 py-0.5 rounded font-extrabold border ${
-                  isAlurA 
-                    ? 'bg-rose-950/80 text-rose-300 border-rose-600/50' 
-                    : 'bg-amber-950/80 text-amber-300 border-amber-600/50'
-                }`}>
-                  {isAlurA ? 'ALUR A — TSUNAMI' : 'ALUR B — NON-TSUNAMI'}
+                <span className={`text-[10px] font-mono uppercase tracking-widest px-2 py-0.5 rounded font-extrabold border ${activeMeta.bgColor} ${activeMeta.borderColor} ${activeMeta.accentColor}`}>
+                  {activeMeta.protokolCode}
                 </span>
               </div>
               <h2 id="evakuasi-modal-title" className="text-base sm:text-lg font-bold text-white font-display mt-1">
-                Pusat Perintah & Navigasi Evakuasi Cepat
+                Pusat Perintah & Navigasi Sadar Bencana
               </h2>
               <p className="text-xs text-slate-400">
-                Pemerintah Provinsi Sumatera Barat & BNPB / BPBD Sumbar
+                Pusdalops BPBD Provinsi Sumatera Barat & Satgas Tanggap Darurat
               </p>
             </div>
           </div>
@@ -226,69 +303,73 @@ export const EvakuasiModal: React.FC<EvakuasiModalProps> = ({
           
           {/* BANNER STATUS BENCANA AKTIF BMKG (Jika Ada) */}
           {bencanaAktifInfo && bencanaAktifInfo.status_siaga !== 'NORMAL_SIAGA' && (
-            <div className="p-3 rounded-xl bg-rose-950/40 border border-rose-600/40 flex items-start gap-2.5">
+            <div className="p-3 rounded-xl bg-rose-950/40 border border-rose-600/40 flex items-start gap-2.5 animate-in fade-in">
               <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5 animate-pulse" />
               <div>
                 <span className="font-bold text-rose-200 block text-xs">
                   {bencanaAktifInfo.keterangan}
                 </span>
                 <span className="text-[11px] text-rose-300/80">
-                  Sistem otomatis merekomendasikan mode keselamatan: {bencanaAktifInfo.alur_rekomendasi}.
+                  Sistem otomatis merekomendasikan protokol keselamatan: {bencanaAktifInfo.alur_rekomendasi}.
                 </span>
               </div>
             </div>
           )}
 
-          {/* 1. SELEKSI 2 JENIS BENCANA MURNI (TSUNAMI vs NON-TSUNAMI) */}
+          {/* 1. SELEKSI 4 PROTOKOL BENCANA SPESIFIK */}
           <div className="space-y-2">
             <label className="text-[11px] font-semibold text-slate-300 uppercase tracking-wider block font-mono">
-              Pilih Jenis Ancaman Bencana:
+              Pilih Protokol Bahaya Bencana:
             </label>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-              {/* Opsi 1: Tsunami (Alur A) */}
-              <button
-                type="button"
-                onClick={() => setJenisBencana('tsunami')}
-                className={`p-3.5 rounded-xl border text-left transition-all relative overflow-hidden ${
-                  isAlurA
-                    ? 'bg-rose-950/50 border-rose-500/80 text-white shadow-lg shadow-rose-950/40 ring-1 ring-rose-500/50'
-                    : 'bg-[#121D28] border-[#223548] text-slate-300 hover:bg-[#182635] hover:border-slate-600'
-                }`}
-              >
-                <div className="flex items-center gap-2 mb-1.5">
-                  <Waves className={`w-4 h-4 ${isAlurA ? 'text-rose-400' : 'text-slate-400'}`} />
-                  <span className="font-bold text-xs">🌊 Tsunami</span>
-                  <span className="ml-auto text-[9px] font-mono px-1.5 py-0.5 rounded bg-rose-900/60 text-rose-300 border border-rose-700/50 font-bold">
-                    ALUR A
-                  </span>
-                </div>
-                <p className="text-[11px] text-slate-300 leading-relaxed">
-                  Evakuasi vertikal ke <strong>Shelter TES</strong> atau keluar dari zona merah bahaya pesisir.
-                </p>
-              </button>
+              {HAZARD_PROTOCOLS.map((proto) => {
+                const isSelected = selectedHazard === proto.id;
+                const Icon = proto.icon;
+                return (
+                  <button
+                    key={proto.id}
+                    type="button"
+                    onClick={() => setSelectedHazard(proto.id)}
+                    className={`p-3 rounded-xl border text-left transition-all relative overflow-hidden flex flex-col justify-between ${
+                      isSelected
+                        ? `${proto.bgColor} ${proto.borderColor} text-white shadow-lg ring-1 ${proto.ringColor}`
+                        : 'bg-[#121D28] border-[#223548] text-slate-300 hover:bg-[#182635] hover:border-slate-600'
+                    }`}
+                  >
+                    <div>
+                      <div className="flex items-center justify-between mb-1.5">
+                        <div className="flex items-center gap-2">
+                          <Icon className={`w-4 h-4 ${isSelected ? proto.accentColor : 'text-slate-400'}`} />
+                          <span className="font-bold text-xs">{proto.label}</span>
+                        </div>
+                        <span className={`text-[9px] font-mono px-1.5 py-0.5 rounded border font-bold ${
+                          isSelected ? `${proto.bgColor} ${proto.accentColor} ${proto.borderColor}` : 'bg-slate-800 text-slate-400 border-slate-700'
+                        }`}>
+                          {proto.id.toUpperCase()}
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-slate-400 mb-2">{proto.subLabel}</p>
+                    </div>
 
-              {/* Opsi 2: Non-Tsunami (Alur B) */}
-              <button
-                type="button"
-                onClick={() => setJenisBencana('non_tsunami')}
-                className={`p-3.5 rounded-xl border text-left transition-all relative overflow-hidden ${
-                  !isAlurA
-                    ? 'bg-amber-950/50 border-amber-500/80 text-white shadow-lg shadow-amber-950/40 ring-1 ring-amber-500/50'
-                    : 'bg-[#121D28] border-[#223548] text-slate-300 hover:bg-[#182635] hover:border-slate-600'
-                }`}
-              >
-                <div className="flex items-center gap-2 mb-1.5">
-                  <AlertTriangle className={`w-4 h-4 ${!isAlurA ? 'text-amber-400' : 'text-slate-400'}`} />
-                  <span className="font-bold text-xs">🌋 Non-Tsunami</span>
-                  <span className="ml-auto text-[9px] font-mono px-1.5 py-0.5 rounded bg-amber-900/60 text-amber-300 border border-amber-700/50 font-bold">
-                    ALUR B
-                  </span>
-                </div>
-                <p className="text-[11px] text-slate-300 leading-relaxed">
-                  Evakuasi ke posko pengungsi terdekat (mencakup galodo, gempa, banjir bandang, longsor, erupsi).
-                </p>
-              </button>
+                    <div className="border-t border-slate-700/50 pt-1.5 text-[10px]">
+                      <span className="text-slate-200 block font-medium">&bull; {proto.pedoman}</span>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Kotak Pedoman Khusus Protokol Terpilih */}
+            <div className={`p-3 rounded-xl border text-xs leading-relaxed ${activeMeta.bgColor} ${activeMeta.borderColor}`}>
+              <div className="flex items-center gap-2 font-bold mb-1 text-white">
+                <ShieldAlert className={`w-4 h-4 ${activeMeta.accentColor}`} />
+                <span>PANDUAN OPERASIONAL: {activeMeta.protokolCode}</span>
+              </div>
+              <p className="text-slate-300 text-[11px]">{activeMeta.pedoman}</p>
+              <div className="mt-1.5 text-[11px] font-bold text-rose-300 bg-black/30 p-1.5 rounded border border-rose-500/30">
+                ⚠️ PERINGATAN KESELAMATAN: {activeMeta.larangan}
+              </div>
             </div>
           </div>
 
@@ -353,111 +434,88 @@ export const EvakuasiModal: React.FC<EvakuasiModalProps> = ({
             </div>
           </div>
 
-          {/* 3. PROTOKOL ALUR */}
-          <div className={`p-3 rounded-xl border text-xs ${
-            isAlurA 
-              ? 'bg-rose-950/20 border-rose-700/30 text-rose-200' 
-              : 'bg-blue-950/20 border-blue-700/30 text-blue-200'
-          }`}>
-            <div className="flex items-center gap-2 font-bold mb-1">
-              <Info className="w-4 h-4 shrink-0" />
-              <span>
-                {isAlurA ? 'Protokol Evakuasi Tsunami (Alur A):' : 'Protokol Evakuasi Non-Tsunami (Alur B):'}
-              </span>
-            </div>
-            <p className="text-[11px] text-slate-300 leading-relaxed">
-              {isAlurA ? (
-                <>Sistem menghitung rute tercepat ke <strong>Shelter Vertikal TES</strong> terdekat atau melintasi <strong>Garis Aman Bypass</strong> di luar zona bahaya rendaman pesisir.</>
-              ) : (
-                <>Sistem memprioritaskan pencarian posko pengungsi terdekat yang berlokasi di kecamatan Anda dan menghindari ruas jalan terputus.</>
-              )}
-            </p>
-          </div>
-
-          {/* 4. MODA TRANSPORTASI */}
+          {/* 3. PILIHAN MODA TRANSPORTASI */}
           <div className="space-y-1.5">
-            <label className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block font-mono">
-              Moda Transportasi:
+            <label className="text-[11px] font-semibold text-slate-300 uppercase tracking-wider block font-mono">
+              Moda Perjalanan Evakuasi:
             </label>
             <div className="grid grid-cols-2 gap-2">
               <button
                 type="button"
                 onClick={() => setSelectedModa('mobil')}
-                className={`flex items-center justify-center gap-2 py-2 rounded-xl text-xs font-bold border transition-all ${
+                className={`py-2 px-3 rounded-xl border flex items-center justify-center gap-2 font-semibold transition-all ${
                   selectedModa === 'mobil'
-                    ? 'bg-blue-600 border-blue-400 text-white shadow-md'
-                    : 'bg-[#121D28] border-[#223548] text-slate-400 hover:text-white'
+                    ? 'bg-blue-600/30 text-blue-300 border-blue-500 shadow-sm'
+                    : 'bg-[#121D28] text-slate-400 border-[#223548] hover:bg-[#182635] hover:text-slate-200'
                 }`}
               >
-                <span>🚗 Kendaraan (Mobil / Motor)</span>
+                <span>🚗 Kendaraan Bermotor</span>
               </button>
 
               <button
                 type="button"
                 onClick={() => setSelectedModa('jalan_kaki')}
-                className={`flex items-center justify-center gap-2 py-2 rounded-xl text-xs font-bold border transition-all ${
+                className={`py-2 px-3 rounded-xl border flex items-center justify-center gap-2 font-semibold transition-all ${
                   selectedModa === 'jalan_kaki'
-                    ? 'bg-emerald-600 border-emerald-400 text-white shadow-md'
-                    : 'bg-[#121D28] border-[#223548] text-slate-400 hover:text-white'
+                    ? 'bg-emerald-600/30 text-emerald-300 border-emerald-500 shadow-sm'
+                    : 'bg-[#121D28] text-slate-400 border-[#223548] hover:bg-[#182635] hover:text-slate-200'
                 }`}
               >
-                <span>🏃 Jalan Kaki / Lari Darurat</span>
+                <span>🏃 Jalan Kaki / Berlari</span>
               </button>
             </div>
           </div>
 
-          {/* Footer Action Buttons */}
-          <div className="pt-3 border-t border-[#233547] flex items-center justify-end gap-2.5">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold transition-colors cursor-pointer"
-            >
-              Batal
-            </button>
-
-            {/* Tombol Utama: Langsung Aktif & Siap */}
+          {/* TOMBOL AKSI SUBMIT UTAMA */}
+          <div className="pt-2">
             <button
               type="submit"
               disabled={loading}
-              className="flex items-center gap-2 px-6 py-2.5 rounded-xl font-bold font-display uppercase tracking-wider text-xs sm:text-sm text-white transition-all shadow-lg active:scale-98 bg-gradient-to-r from-[#DC2626] via-[#E11D48] to-[#EF4444] hover:from-[#B91C1C] hover:to-[#DC2626] shadow-rose-950/60 cursor-pointer disabled:opacity-50"
+              className={`w-full py-3.5 px-4 rounded-xl font-bold text-white shadow-xl flex items-center justify-center gap-2 text-sm transition-all transform active:scale-[0.99] ${
+                selectedHazard === 'tsunami'
+                  ? 'bg-gradient-to-r from-rose-600 to-rose-700 hover:from-rose-500 hover:to-rose-600 shadow-rose-950/50'
+                  : selectedHazard === 'galodo'
+                  ? 'bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-500 hover:to-amber-600 shadow-amber-950/50'
+                  : selectedHazard === 'sesar'
+                  ? 'bg-gradient-to-r from-orange-600 to-orange-700 hover:from-orange-500 hover:to-orange-600 shadow-orange-950/50'
+                  : 'bg-gradient-to-r from-red-600 to-red-700 hover:from-red-500 hover:to-red-600 shadow-red-950/50'
+              } disabled:opacity-50 disabled:cursor-not-allowed`}
             >
               {loading ? (
                 <>
                   <RefreshCw className="w-4 h-4 animate-spin" />
-                  <span>Menghitung Rute...</span>
+                  <span>Menganalisis Rute & Topografi...</span>
                 </>
               ) : (
                 <>
-                  <Navigation className="w-4 h-4" />
-                  <span>Cari Lokasi Aman</span>
+                  <Navigation className="w-4 h-4 animate-pulse" />
+                  <span>Kalkulasi Rute Evakuasi ({activeMeta.label})</span>
+                  <ChevronRight className="w-4 h-4" />
                 </>
               )}
             </button>
           </div>
         </form>
         ) : (
-          <div className="flex flex-col h-[520px] max-h-[75vh] bg-[#09111A]">
-            <div className="p-3 bg-cyan-950/30 border-b border-cyan-800/30 flex items-center justify-between text-xs text-cyan-200">
-              <div className="flex items-center gap-2">
-                <Bot className="w-4 h-4 text-cyan-400" />
-                <span>Asisten Virtual AI Siaga Evakuasi & Mitigasi</span>
-              </div>
-              <span className="text-[10px] font-mono text-cyan-400/70">Terhubung Data Geospasial</span>
-            </div>
-            <div className="flex-1 overflow-hidden">
-              <DisasterChatbot
-                isEmbedded={true}
-                userCoords={activeCoords ? { lat: activeCoords.lat, lng: activeCoords.lon } : userCoords}
-                onFlyToLocation={(loc) => {
-                  onFlyToLocation?.(loc);
-                }}
-                onSelectDestination={(loc) => {
-                  onSelectDestination?.(loc);
-                  onClose();
-                }}
-              />
-            </div>
+          /* Tab 2: Disaster Chatbot AI */
+          <div className="p-3 sm:p-4 flex-1 overflow-hidden flex flex-col min-h-[420px]">
+            <DisasterChatbot 
+              userCoords={activeCoords ? { lat: activeCoords.lat, lng: activeCoords.lon } : undefined}
+              onFlyToLocation={onFlyToLocation}
+              onSelectDestination={(loc: { lat: number; lng: number; nama: string }) => {
+                if (onSelectDestination) {
+                  onSelectDestination(loc);
+                }
+                onStartEvakuasi({
+                  jenis_bencana: selectedHazard,
+                  lat: activeCoords?.lat,
+                  lon: activeCoords?.lon,
+                  moda: selectedModa,
+                  kecamatan_nama: detectedWilayahNama || undefined
+                });
+              }}
+              isEmbedded={true}
+            />
           </div>
         )}
       </div>
