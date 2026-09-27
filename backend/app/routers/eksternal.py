@@ -79,8 +79,8 @@ async def get_peringatan_cuaca(db: AsyncSession = Depends(get_async_db)):
                 WHEN 'Moderate' THEN 2 
                 ELSE 3 
             END ASC,
-            id DESC
-        LIMIT 10;
+            area_desc ASC
+        LIMIT 50;
     """)
     result = await db.execute(query)
     rows = result.fetchall()

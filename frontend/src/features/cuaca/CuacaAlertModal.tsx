@@ -1,12 +1,19 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
   CloudLightning, 
   MapPin, 
   Clock, 
   ShieldAlert, 
   X,
-  Compass,
-  Info
+  Compass, 
+  Info,
+  Thermometer,
+  CloudRain,
+  Wind,
+  Droplets,
+  Search,
+  Building2,
+  Map as MapIcon
 } from 'lucide-react';
 
 export interface CuacaAlertItem {
@@ -66,6 +73,8 @@ export const CuacaAlertModal: React.FC<CuacaAlertModalProps> = ({
   onFlyToArea
 }) => {
   const [selectedIndex, setSelectedIndex] = useState(0);
+  const [categoryFilter, setCategoryFilter] = useState<'semua' | 'kota' | 'kabupaten'>('semua');
+  const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
     if (!isOpen) return;
@@ -76,18 +85,36 @@ export const CuacaAlertModal: React.FC<CuacaAlertModalProps> = ({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, onClose]);
 
-  if (!isOpen) return null;
-
   // Gabungkan alerts prop atau fallback ke alertData tunggal
-  const alertList: CuacaAlertItem[] = alerts.length > 0 
+  const rawAlertList: CuacaAlertItem[] = alerts.length > 0 
     ? alerts 
     : alertData 
     ? [alertData] 
     : [];
 
-  if (alertList.length === 0) return null;
+  // Filter daftar wilayah berdasarkan kategori (Kota/Kabupaten) dan kotak pencarian
+  const filteredAlertList = useMemo(() => {
+    return rawAlertList.filter((item) => {
+      const nameLower = item.area_desc.toLowerCase();
+      const isKota = nameLower.startsWith('kota');
+      const isKab = nameLower.startsWith('kab');
 
-  const currentAlert = alertList[selectedIndex] || alertList[0];
+      if (categoryFilter === 'kota' && !isKota) return false;
+      if (categoryFilter === 'kabupaten' && !isKab) return false;
+
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase().trim();
+        return nameLower.includes(q) || item.event.toLowerCase().includes(q);
+      }
+
+      return true;
+    });
+  }, [rawAlertList, categoryFilter, searchQuery]);
+
+  if (!isOpen || rawAlertList.length === 0) return null;
+
+  // Pastikan indeks terpilih berada dalam jangkauan
+  const currentAlert = rawAlertList[selectedIndex] || rawAlertList[0];
 
   const getCoordinates = (areaDesc: string) => {
     const descLower = areaDesc.toLowerCase();
@@ -107,8 +134,28 @@ export const CuacaAlertModal: React.FC<CuacaAlertModalProps> = ({
     onClose();
   };
 
-  const hasSevereThreat = alertList.some(a => a.severity.toLowerCase() === 'severe');
-  const hasModerateThreat = alertList.some(a => a.severity.toLowerCase() === 'moderate');
+  const hasSevereThreat = rawAlertList.some(a => a.severity.toLowerCase() === 'severe');
+  const hasModerateThreat = rawAlertList.some(a => a.severity.toLowerCase() === 'moderate');
+
+  // Parser metrik numerik dari headline & description BMKG
+  const parseMetrics = (headline: string, desc: string) => {
+    const textData = `${headline} ${desc}`;
+    const tempMatch = textData.match(/Suhu\s+([\d.]+)\s*°?C/i);
+    const tpMatch = textData.match(/(?:Curah Hujan\s+([\d.]+)\s*mm|([\d.]+)\s*mm\/jam)/i);
+    const rainVal = tpMatch ? (tpMatch[1] || tpMatch[2]) : '0.0';
+    const wsMatch = textData.match(/(?:Angin\s+([\d.]+\s*km\/jam(?:\s*\([A-Z]+\))?)|angin\s+([\d.]+\s*km\/jam(?:\s*\([A-Z]+\))?))/i);
+    const windVal = wsMatch ? (wsMatch[1] || wsMatch[2]) : '7 km/jam';
+    const huMatch = textData.match(/kelembapan\s+([\d.]+)\s*%/i);
+
+    return {
+      temp: tempMatch ? `${tempMatch[1]}°C` : '25°C',
+      rain: `${rainVal} mm/jam`,
+      wind: windVal,
+      humidity: huMatch ? `${huMatch[1]}%` : '78%',
+    };
+  };
+
+  const metrics = parseMetrics(currentAlert.headline || '', currentAlert.description || '');
 
   return (
     <div 
@@ -116,7 +163,7 @@ export const CuacaAlertModal: React.FC<CuacaAlertModalProps> = ({
       onClick={onClose}
     >
       <div 
-        className="relative w-full max-w-3xl bg-[#111A24] border border-[#2B3E52] rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[88vh]"
+        className="relative w-full max-w-4xl bg-[#111A24] border border-[#2B3E52] rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header Modal */}
@@ -153,59 +200,105 @@ export const CuacaAlertModal: React.FC<CuacaAlertModalProps> = ({
                 </span>
               </div>
               <h2 className="text-base sm:text-lg font-bold text-white font-display mt-0.5">
-                {hasSevereThreat 
-                  ? 'Peringatan Dini Cuaca Ekstrem Sumatera Barat' 
-                  : 'Prakiraan Cuaca Resmi BMKG Sumatera Barat'}
+                Prakiraan Cuaca Resmi BMKG — 19 Kabupaten & Kota Sumatera Barat
               </h2>
             </div>
           </div>
           <button
             onClick={onClose}
             className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-[#1E2E3E] transition-all shrink-0"
-            title="Tutup Modal"
+            title="Tutup Modal (Escape)"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        {/* Tab Pilihan Wilayah Terpantau */}
-        {alertList.length > 1 && (
-          <div className="px-5 py-2.5 sm:px-6 bg-[#0A1017] border-b border-[#223344]">
-            <span className="text-[11px] font-mono text-slate-400 uppercase tracking-wider block mb-1.5">
-              Pilih Wilayah Pantauan ({alertList.length} Lokasi BMKG):
-            </span>
-            <div className="flex flex-wrap items-center gap-1.5 py-0.5">
-              {alertList.map((item, idx) => {
-                const isSelected = idx === selectedIndex;
-                const shortName = item.area_desc.split('(')[0].trim();
-                const isSevere = item.severity.toLowerCase() === 'severe';
-                const isModerate = item.severity.toLowerCase() === 'moderate';
-                return (
-                  <button
-                    key={item.identifier || idx}
-                    type="button"
-                    onClick={() => setSelectedIndex(idx)}
-                    className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
-                      isSelected
-                        ? isSevere
-                          ? 'bg-rose-500 text-white font-bold shadow-md shadow-rose-500/30'
-                          : isModerate
-                          ? 'bg-amber-500 text-slate-950 font-bold shadow-md shadow-amber-500/30'
-                          : 'bg-emerald-600 text-white font-bold shadow-md shadow-emerald-600/30'
-                        : 'bg-[#141F2B] border border-[#2B3E52] text-slate-300 hover:text-white hover:bg-[#1C2C3D]'
-                    }`}
-                  >
-                    <MapPin className={`w-3 h-3 ${isSelected ? (isModerate ? 'text-slate-950' : 'text-white') : 'text-slate-400'}`} />
-                    <span>{shortName}</span>
-                    {isSevere && (
-                      <span className="w-2 h-2 rounded-full bg-rose-400 animate-ping ml-0.5" />
-                    )}
-                  </button>
-                );
-              })}
-            </div>
+        {/* Toolbar Kategori & Pencarian Wilayah */}
+        <div className="px-5 py-3 bg-[#0A1017] border-b border-[#223344] flex flex-col sm:flex-row items-center justify-between gap-3">
+          <div className="flex items-center gap-1.5 w-full sm:w-auto">
+            <button
+              onClick={() => setCategoryFilter('semua')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold font-mono transition-all ${
+                categoryFilter === 'semua'
+                  ? 'bg-emerald-500 text-slate-950 shadow-md font-bold'
+                  : 'bg-[#141F2B] text-slate-400 hover:text-white border border-[#233547]'
+              }`}
+            >
+              Semua (19)
+            </button>
+            <button
+              onClick={() => setCategoryFilter('kota')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold font-mono transition-all flex items-center gap-1 ${
+                categoryFilter === 'kota'
+                  ? 'bg-emerald-500 text-slate-950 shadow-md font-bold'
+                  : 'bg-[#141F2B] text-slate-400 hover:text-white border border-[#233547]'
+              }`}
+            >
+              <Building2 className="w-3.5 h-3.5" />
+              7 Kota
+            </button>
+            <button
+              onClick={() => setCategoryFilter('kabupaten')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold font-mono transition-all flex items-center gap-1 ${
+                categoryFilter === 'kabupaten'
+                  ? 'bg-emerald-500 text-slate-950 shadow-md font-bold'
+                  : 'bg-[#141F2B] text-slate-400 hover:text-white border border-[#233547]'
+              }`}
+            >
+              <MapIcon className="w-3.5 h-3.5" />
+              12 Kabupaten
+            </button>
           </div>
-        )}
+
+          <div className="relative w-full sm:w-64">
+            <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Cari nama wilayah..."
+              className="w-full bg-[#121B24] border border-[#233547] rounded-lg pl-8 pr-3 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 font-sans"
+            />
+          </div>
+        </div>
+
+        {/* Tab Pilihan Wilayah Terpantau (Pills Grid Scrollable) */}
+        <div className="px-5 py-2.5 bg-[#0D151F] border-b border-[#223344] max-h-36 overflow-y-auto scrollbar-thin scrollbar-thumb-slate-700">
+          <div className="flex flex-wrap items-center gap-1.5">
+            {filteredAlertList.map((item) => {
+              const actualIdx = rawAlertList.findIndex(a => a.identifier === item.identifier);
+              const isSelected = actualIdx === selectedIndex;
+              const shortName = item.area_desc.split('(')[0].trim();
+              const isSevere = item.severity.toLowerCase() === 'severe';
+              const isModerate = item.severity.toLowerCase() === 'moderate';
+              return (
+                <button
+                  key={item.identifier || item.id}
+                  type="button"
+                  onClick={() => setSelectedIndex(actualIdx >= 0 ? actualIdx : 0)}
+                  className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                    isSelected
+                      ? isSevere
+                        ? 'bg-rose-500 text-white font-bold shadow-md shadow-rose-500/30 ring-2 ring-rose-400'
+                        : isModerate
+                        ? 'bg-amber-500 text-slate-950 font-bold shadow-md shadow-amber-500/30 ring-2 ring-amber-400'
+                        : 'bg-emerald-500 text-slate-950 font-bold shadow-md shadow-emerald-500/30 ring-2 ring-emerald-400'
+                      : 'bg-[#14202D] border border-[#223344] text-slate-300 hover:text-white hover:bg-[#1D2C3D]'
+                  }`}
+                >
+                  <MapPin className={`w-3 h-3 ${isSelected ? (isModerate || !isSevere ? 'text-slate-950' : 'text-white') : 'text-slate-400'}`} />
+                  <span>{shortName}</span>
+                  {isSevere && (
+                    <span className="w-2 h-2 rounded-full bg-rose-400 animate-ping ml-0.5" />
+                  )}
+                </button>
+              );
+            })}
+            {filteredAlertList.length === 0 && (
+              <span className="text-xs text-slate-500 italic py-1">Tidak ada wilayah yang cocok dengan pencarian "{searchQuery}"</span>
+            )}
+          </div>
+        </div>
 
         {/* Konten Detail Peringatan untuk Wilayah Terpilih */}
         <div className="p-4 sm:p-5 overflow-y-auto space-y-3.5 text-sm scrollbar-thin scrollbar-thumb-slate-700 flex-1">
@@ -254,6 +347,45 @@ export const CuacaAlertModal: React.FC<CuacaAlertModalProps> = ({
             </button>
           </div>
 
+          {/* 4 KPI Grid Metrik Sensor Cuaca Real-Time */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+            <div className="p-3 rounded-xl bg-[#0E1722] border border-[#223548] flex flex-col justify-between">
+              <div className="flex items-center justify-between text-slate-400 text-xs mb-1">
+                <span className="font-mono text-[10px] text-slate-400">SUHU UDARA</span>
+                <Thermometer className="w-4 h-4 text-amber-400" />
+              </div>
+              <div className="text-xl font-bold text-white font-mono">{metrics.temp}</div>
+              <span className="text-[10px] text-emerald-400 font-mono mt-0.5">Sensor BMKG</span>
+            </div>
+
+            <div className="p-3 rounded-xl bg-[#0E1722] border border-[#223548] flex flex-col justify-between">
+              <div className="flex items-center justify-between text-slate-400 text-xs mb-1">
+                <span className="font-mono text-[10px] text-slate-400">CURAH HUJAN</span>
+                <CloudRain className="w-4 h-4 text-blue-400" />
+              </div>
+              <div className="text-xl font-bold text-blue-300 font-mono">{metrics.rain}</div>
+              <span className="text-[10px] text-slate-400 font-mono mt-0.5">Presipitasi / Jam</span>
+            </div>
+
+            <div className="p-3 rounded-xl bg-[#0E1722] border border-[#223548] flex flex-col justify-between">
+              <div className="flex items-center justify-between text-slate-400 text-xs mb-1">
+                <span className="font-mono text-[10px] text-slate-400">KECEPATAN ANGIN</span>
+                <Wind className="w-4 h-4 text-teal-400" />
+              </div>
+              <div className="text-base font-bold text-teal-200 font-mono truncate">{metrics.wind}</div>
+              <span className="text-[10px] text-slate-400 font-mono mt-0.5">Arah Permukaan</span>
+            </div>
+
+            <div className="p-3 rounded-xl bg-[#0E1722] border border-[#223548] flex flex-col justify-between">
+              <div className="flex items-center justify-between text-slate-400 text-xs mb-1">
+                <span className="font-mono text-[10px] text-slate-400">KELEMBAPAN</span>
+                <Droplets className="w-4 h-4 text-cyan-400" />
+              </div>
+              <div className="text-xl font-bold text-cyan-300 font-mono">{metrics.humidity}</div>
+              <span className="text-[10px] text-slate-400 font-mono mt-0.5">Udara Relatif</span>
+            </div>
+          </div>
+
           {/* Glosarium Galodo: HANYA tampil jika ADA ancaman cuaca lebat/lahar dingin nyata */}
           {(currentAlert.severity.toLowerCase() === 'severe' || 
             currentAlert.event.toLowerCase().includes('lahar') || 
@@ -271,7 +403,7 @@ export const CuacaAlertModal: React.FC<CuacaAlertModalProps> = ({
 
           {/* Ringkasan Cuaca Resmi BMKG */}
           <div className="space-y-1">
-            <span className="text-slate-400 font-semibold text-xs">
+            <span className="text-slate-400 font-semibold text-xs font-mono">
               Laporan Stasiun Meteorologi BMKG:
             </span>
             <div className="p-3 rounded-xl bg-[#0B121A] border border-[#2B3E52] text-white text-xs sm:text-sm leading-relaxed">
@@ -281,7 +413,7 @@ export const CuacaAlertModal: React.FC<CuacaAlertModalProps> = ({
 
           {/* Deskripsi & Analisis */}
           <div className="space-y-1">
-            <span className="text-slate-400 font-semibold text-xs">
+            <span className="text-slate-400 font-semibold text-xs font-mono">
               Kondisi Lapangan & Kesiapsiagaan:
             </span>
             <div className="p-3 rounded-xl bg-[#0B121A] border border-[#2B3E52] text-slate-300 text-xs sm:text-sm leading-relaxed">

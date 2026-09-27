@@ -73,7 +73,7 @@ const BMKG_NODES_COORDS: Record<string, { lat: number; lng: number }> = {
   '13.75.01.1001': { lat: -0.305, lng: 100.369 }, // Kota Bukittinggi (Dataran Tinggi)
   '13.72.01.1001': { lat: -0.798, lng: 100.655 }, // Kota Solok (Aliran Batang Lembang)
   '13.74.01.1001': { lat: -0.463, lng: 100.400 }, // Kota Padang Panjang (Lembah Anai / Lereng Marapi)
-  '13.76.01.1001': { lat: -0.225, lng: 100.631 }, // Kota Payakumbuh (DAS Batang Agam)
+  '13.76.01.1002': { lat: -0.225, lng: 100.631 }, // Kota Payakumbuh (DAS Batang Agam)
   '13.73.01.1001': { lat: -0.681, lng: 100.777 }, // Kota Sawahlunto (Perbukitan Batubara)
   '13.77.01.1001': { lat: -0.626, lng: 100.121 }, // Kota Pariaman (Pesisir Pantai)
 
@@ -83,13 +83,13 @@ const BMKG_NODES_COORDS: Record<string, { lat: number; lng: number }> = {
   '13.05.01.2001': { lat: -0.640, lng: 100.280 }, // Kab. Padang Pariaman (DAS Batang Anai)
   '13.01.01.2001': { lat: -1.350, lng: 100.570 }, // Kab. Pesisir Selatan (Painan / Batang Tapan)
   '13.12.01.2001': { lat: 0.180, lng: 99.820 },  // Kab. Pasaman Barat (Simpang Empat)
-  '13.08.01.2001': { lat: 0.147, lng: 100.170 }, // Kab. Pasaman (Lubuk Sikaping)
+  '13.08.04.2001': { lat: 0.147, lng: 100.170 }, // Kab. Pasaman (Lubuk Sikaping)
   '13.07.01.2001': { lat: -0.142, lng: 100.666 }, // Kab. Lima Puluh Kota (Harau / Pangkalan)
   '13.02.06.2001': { lat: -1.085, lng: 100.730 }, // Kab. Solok (Lembah Gumanti / Danau Kembar)
   '13.11.01.2001': { lat: -1.480, lng: 101.120 }, // Kab. Solok Selatan (Sungai Pagu / Batang Suliti)
-  '13.03.01.2001': { lat: -0.691, lng: 101.001 }, // Kab. Sijunjung (Muaro Sijunjung)
-  '13.10.01.2001': { lat: -0.986, lng: 101.371 }, // Kab. Dharmasraya (Pulau Punjung / Batang Hari)
-  '13.09.01.2001': { lat: -2.024, lng: 99.594 },  // Kab. Kepulauan Mentawai (Tuapejat / Siberut)
+  '13.03.04.2001': { lat: -0.691, lng: 101.001 }, // Kab. Sijunjung (Muaro Sijunjung)
+  '13.10.02.2001': { lat: -0.986, lng: 101.371 }, // Kab. Dharmasraya (Pulau Punjung / Batang Hari)
+  '13.09.02.2001': { lat: -2.024, lng: 99.594 },  // Kab. Kepulauan Mentawai (Tuapejat / Siberut)
 };
 
 export const MapCanvas: React.FC<MapCanvasProps> = ({

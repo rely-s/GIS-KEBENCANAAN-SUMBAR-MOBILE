@@ -51,7 +51,7 @@ SUMBAR_WEATHER_NODES = [
     {"code": "13.75.01.1001", "name": "Kota Bukittinggi", "threat": "Angin Kencang, Longsor Ngarai Sianok & Kabut Tebal"},
     {"code": "13.72.01.1001", "name": "Kota Solok", "threat": "Luapan Sungai Batang Lembang & Genangan"},
     {"code": "13.74.01.1001", "name": "Kota Padang Panjang", "threat": "Curah Hujan Ekstrem, Aliran Lahar Dingin & Kabut Tebal"},
-    {"code": "13.76.01.1001", "name": "Kota Payakumbuh", "threat": "Luapan Sungai Batang Agam & Genangan Pemukiman"},
+    {"code": "13.76.01.1002", "name": "Kota Payakumbuh", "threat": "Luapan Sungai Batang Agam & Genangan Pemukiman"},
     {"code": "13.73.01.1001", "name": "Kota Sawahlunto", "threat": "Pergerakan Tanah & Longsor Lereng Tebing"},
     {"code": "13.77.01.1001", "name": "Kota Pariaman", "threat": "Gelombang Pasang, Abrasi Pantai & Genangan Muara"},
 
@@ -61,13 +61,13 @@ SUMBAR_WEATHER_NODES = [
     {"code": "13.05.01.2001", "name": "Kab. Padang Pariaman", "threat": "Banjir DAS Batang Anai & Longsor Tebing Perbukitan"},
     {"code": "13.01.01.2001", "name": "Kab. Pesisir Selatan", "threat": "Banjir Bandang DAS Batang Tapan, Longsor & Abrasi"},
     {"code": "13.12.01.2001", "name": "Kab. Pasaman Barat", "threat": "Luapan Sungai Batang Pasaman & Longsor Talamau"},
-    {"code": "13.08.01.2001", "name": "Kab. Pasaman", "threat": "Banjir Bandang Batang Sumpur & Longsor Bonjol/Lubuk Sikaping"},
+    {"code": "13.08.04.2001", "name": "Kab. Pasaman", "threat": "Banjir Bandang Batang Sumpur & Longsor Bonjol/Lubuk Sikaping"},
     {"code": "13.07.01.2001", "name": "Kab. Lima Puluh Kota", "threat": "Longsor Tebing Lembah Harau & Luapan Batang Pangkalan"},
     {"code": "13.02.06.2001", "name": "Kab. Solok", "threat": "Banjir Bandang Lembah Gumanti & Longsor Lereng Danau"},
     {"code": "13.11.01.2001", "name": "Kab. Solok Selatan", "threat": "Banjir Bandang Batang Suliti & Batang Bangko"},
-    {"code": "13.03.01.2001", "name": "Kab. Sijunjung", "threat": "Luapan Sungai Batang Kuantan / Batang Sukam & Longsor"},
-    {"code": "13.10.01.2001", "name": "Kab. Dharmasraya", "threat": "Luapan Sungai Batang Hari & Genangan Dataran Rendah"},
-    {"code": "13.09.01.2001", "name": "Kab. Kepulauan Mentawai", "threat": "Gelombang Tinggi Samudera Hindia & Angin Kencang Pesisir"}
+    {"code": "13.03.04.2001", "name": "Kab. Sijunjung", "threat": "Luapan Sungai Batang Kuantan / Batang Sukam & Longsor"},
+    {"code": "13.10.02.2001", "name": "Kab. Dharmasraya", "threat": "Luapan Sungai Batang Hari & Genangan Dataran Rendah"},
+    {"code": "13.09.02.2001", "name": "Kab. Kepulauan Mentawai", "threat": "Gelombang Tinggi Samudera Hindia & Angin Kencang Pesisir"}
 ]
 
 async def sync_bmkg_weather_alerts():
