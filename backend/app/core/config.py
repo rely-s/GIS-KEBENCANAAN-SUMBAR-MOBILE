@@ -15,11 +15,14 @@ class Settings(BaseSettings):
     DB_POOL_SIZE: int = Field(default=20, alias="DB_POOL_SIZE")
     DB_MAX_OVERFLOW: int = Field(default=10, alias="DB_MAX_OVERFLOW")
 
-    # CORS
     CORS_ORIGINS: list[str] = [
         "http://localhost:5173",
         "http://127.0.0.1:5173",
         "http://localhost:3000",
+        "http://localhost:8081",
+        "http://127.0.0.1:8081",
+        "http://localhost:8082",
+        "http://127.0.0.1:8082",
         "https://gis-kebencanaan.sumbarprov.go.id"
     ]
 

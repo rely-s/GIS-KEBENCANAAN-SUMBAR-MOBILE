@@ -87,20 +87,27 @@ def check_system_requirements(root_dir: Path):
         log_success(f"PostgreSQL GIS Instance aktif di port {db_port}.")
     else:
         log_warn(f"Port PostgreSQL {db_port} belum aktif merespons.")
-        # Opsi auto-start bila binary postgres lokal ditemukan
-        pg_bin = Path(r"E:\pgsql\bin\postgres.exe")
+        # Opsi auto-start bila binary pg_ctl lokal ditemukan
+        pg_ctl = Path(r"E:\pgsql\bin\pg_ctl.exe")
         pg_data = Path(r"E:\pgsql\data")
-        if pg_bin.exists() and pg_data.exists():
-            log_info("Mencoba menyalakan PostgreSQL GIS Instance secara otomatis...")
-            subprocess.Popen([str(pg_bin), "-D", str(pg_data)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-            # Tunggu hingga 5 detik
-            for _ in range(10):
-                time.sleep(0.5)
-                if is_port_open("127.0.0.1", db_port):
-                    log_success(f"PostgreSQL GIS Instance berhasil dinyalakan di port {db_port}.")
-                    break
+        pg_log = Path(r"E:\pgsql\logfile.log")
+        if pg_ctl.exists() and pg_data.exists():
+            log_info("Mencoba menyalakan PostgreSQL GIS Instance secara otomatis dengan pg_ctl...")
+            pid_file = pg_data / "postmaster.pid"
+            if pid_file.exists():
+                try:
+                    # Bersihkan stale pid file jika postgres sebenarnya tidak berjalan
+                    pid_content = pid_file.read_text().splitlines()
+                    old_pid = int(pid_content[0].strip()) if pid_content else 0
+                    if not is_port_open("127.0.0.1", db_port):
+                        pid_file.unlink(missing_ok=True)
+                except Exception:
+                    pass
+            subprocess.run([str(pg_ctl), "start", "-D", str(pg_data), "-l", str(pg_log), "-w", "-t", "10"], capture_output=True)
+            if is_port_open("127.0.0.1", db_port):
+                log_success(f"PostgreSQL GIS Instance berhasil dinyalakan di port {db_port}.")
             else:
-                log_error(f"PostgreSQL port {db_port} gagal dinyalakan otomatis. Pastikan service berjalan.")
+                log_error(f"PostgreSQL port {db_port} gagal dinyalakan otomatis. Periksa {pg_log}.")
         else:
             log_warn(f"Pastikan database PostgreSQL dengan PostGIS berjalan pada port {db_port}.")
 
@@ -149,10 +156,10 @@ def main():
         env=os.environ.copy()
     )
 
-    # Jalankan Frontend Vite (Port 5173)
+    # Jalankan Frontend Vite (Port 5173 terkonfigurasi di vite.config.ts)
     # Di Windows, npm adalah npm.cmd
     npm_cmd = "npm.cmd" if os.name == "nt" else "npm"
-    frontend_args = [npm_cmd, "run", "dev", "--", "--host", "127.0.0.1", "--port", "5173"]
+    frontend_args = [npm_cmd, "run", "dev"]
     frontend_proc = subprocess.Popen(
         frontend_args,
         cwd=str(frontend_dir),
@@ -164,6 +171,7 @@ def main():
 {TermColor.GREEN}{TermColor.BOLD}--------------------------------------------------------------------------------
 [PORTAL APLIKASI UTAMA]
    - Dashboard GIS Web      : {TermColor.WHITE}http://127.0.0.1:5173/{TermColor.GREEN}
+   - Mobile App Web Preview : {TermColor.WHITE}http://localhost:8082/{TermColor.GREEN} (atau Expo Go: cd mobile; npx expo start)
    - Backend API REST & Geo : {TermColor.WHITE}http://127.0.0.1:8000/{TermColor.GREEN}
    - Dokumentasi Swagger UI : {TermColor.WHITE}http://127.0.0.1:8000/docs{TermColor.GREEN}
 

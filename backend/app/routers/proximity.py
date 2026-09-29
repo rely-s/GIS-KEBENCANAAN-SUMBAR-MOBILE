@@ -130,6 +130,7 @@ def closest_point_on_segment(lat: float, lon: float, p1: List[float], p2: List[f
     closest_lat = y1 + t * dy
     return {"lat": closest_lat, "lon": closest_lon}
 
+@router.get("/check")
 @router.get("/threats")
 async def calculate_proximity_threats(
     lat: float = Query(..., description="Latitude pengguna (-0.9471 untuk Padang)"),

@@ -32,6 +32,7 @@ export const DetailAncamanSheet: React.FC<DetailAncamanSheetProps> = ({
   const isMegathrust = data.tipe === 'megathrust';
   const isSesar = data.tipe === 'sesar';
   const isCuaca = data.tipe === 'cuaca';
+  const isTsunami = data.tipe === 'tsunami_zone';
   const p = data.properties || {};
 
   return (
@@ -43,6 +44,8 @@ export const DetailAncamanSheet: React.FC<DetailAncamanSheetProps> = ({
           ? 'bg-gradient-to-r from-[#2B0E17] to-[#121822]' 
           : isSesar 
           ? 'bg-gradient-to-r from-[#291708] to-[#121822]' 
+          : isTsunami
+          ? 'bg-gradient-to-r from-[#0C2436] to-[#121822]'
           : 'bg-gradient-to-r from-[#1B2735] to-[#121822]'
       }`}>
         <div className="flex items-start gap-3 min-w-0">
@@ -51,9 +54,19 @@ export const DetailAncamanSheet: React.FC<DetailAncamanSheetProps> = ({
               ? 'bg-rose-500/20 border-rose-500/40 text-rose-400' 
               : isSesar 
               ? 'bg-amber-500/20 border-amber-500/40 text-amber-400' 
-              : 'bg-cyan-500/20 border-cyan-500/40 text-cyan-400'
+              : isTsunami
+              ? 'bg-cyan-500/20 border-cyan-500/40 text-cyan-300'
+              : 'bg-blue-500/20 border-blue-500/40 text-blue-400'
           }`}>
-            {isMegathrust ? <Waves className="w-5 h-5 animate-pulse" /> : isSesar ? <Activity className="w-5 h-5" /> : <CloudLightning className="w-5 h-5" />}
+            {isMegathrust ? (
+              <Waves className="w-5 h-5 animate-pulse" />
+            ) : isSesar ? (
+              <Activity className="w-5 h-5" />
+            ) : isTsunami ? (
+              <Waves className="w-5 h-5 text-cyan-300" />
+            ) : (
+              <CloudLightning className="w-5 h-5" />
+            )}
           </div>
 
           <div className="min-w-0">
@@ -63,9 +76,11 @@ export const DetailAncamanSheet: React.FC<DetailAncamanSheetProps> = ({
                   ? 'bg-rose-950 text-rose-300 border-rose-600/50' 
                   : isSesar 
                   ? 'bg-amber-950 text-amber-300 border-amber-600/50' 
-                  : 'bg-cyan-950 text-cyan-300 border-cyan-600/50'
+                  : isTsunami
+                  ? 'bg-cyan-950 text-cyan-300 border-cyan-600/50'
+                  : 'bg-blue-950 text-blue-300 border-blue-600/50'
               }`}>
-                {data.badge || (isMegathrust ? 'ZONA SUBDUKSI SEISMIK' : isSesar ? 'SESAR AKTIF DARAT' : 'PERINGATAN BMKG')}
+                {data.badge || (isMegathrust ? 'ZONA SUBDUKSI SEISMIK' : isSesar ? 'SESAR AKTIF DARAT' : isTsunami ? 'ZONA RAWAN TSUNAMI' : 'PERINGATAN BMKG')}
               </span>
             </div>
 
@@ -83,6 +98,7 @@ export const DetailAncamanSheet: React.FC<DetailAncamanSheetProps> = ({
           onClick={onClose}
           className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 transition-colors shrink-0 ml-2"
           title="Tutup Sheet"
+          aria-label="Tutup Sheet"
         >
           <X className="w-5 h-5" />
         </button>
@@ -129,23 +145,53 @@ export const DetailAncamanSheet: React.FC<DetailAncamanSheetProps> = ({
           </>
         )}
 
-        {/* Rincian Khusus Sesar Semangko */}
+        {/* Rincian Khusus Sesar Semangko / Sempadan Sesar */}
         {isSesar && (
           <div className="space-y-2">
             <div className="grid grid-cols-2 gap-2 text-center">
               <div className="p-2.5 bg-[#1A1510] rounded-xl border border-amber-900/40">
-                <span className="text-[10px] text-slate-400 uppercase font-mono block">Slip Rate</span>
-                <span className="text-sm font-bold text-amber-300 font-mono mt-0.5 block">{p.slip_rate || '11 - 27 mm/tahun'}</span>
+                <span className="text-[10px] text-slate-400 uppercase font-mono block">Slip Rate / Setback</span>
+                <span className="text-sm font-bold text-amber-300 font-mono mt-0.5 block">{p.slip_rate || p.buffer || 'Setback 100 Meter'}</span>
               </div>
               <div className="p-2.5 bg-[#1A1510] rounded-xl border border-amber-900/40">
                 <span className="text-[10px] text-slate-400 uppercase font-mono block">Tipe Patahan</span>
-                <span className="text-sm font-bold text-orange-300 font-mono mt-0.5 block">Dextral Strike-Slip</span>
+                <span className="text-sm font-bold text-orange-300 font-mono mt-0.5 block">{p.tipe_patahan || 'Dextral Strike-Slip'}</span>
               </div>
             </div>
 
-            <div className="p-3 bg-[#111A26] rounded-xl border border-[#233547] text-xs text-slate-300 leading-relaxed">
-              <span className="font-bold text-amber-300 block mb-1">Pedoman Keselamatan Gempa Sesar:</span>
-              <span>Saat guncangan berhenti, segera berkumpul di ruang terbuka (lapangan/alun-alun). Hindari shelter bertingkat tinggi dan jauhi lereng tebing rawan longsor (Ngarai Sianok, Sitinjau).</span>
+            <div className="p-3 bg-[#111A26] rounded-xl border border-[#233547] text-xs text-slate-300 leading-relaxed space-y-1">
+              <span className="font-bold text-amber-300 block">Ketetapan Mitigasi Geologis:</span>
+              <p>{p.ketetapan || p.deskripsi || 'Zona sempadan aktif 100m merupakan area penyangga larangan pembangunan gedung vital publik dan infrastruktur strategis di atas jalur rekahan patahan aktif darat.'}</p>
+              {p.rekomendasi && (
+                <p className="text-[11px] text-amber-200/90 pt-1 border-t border-slate-700/50">🛡️ <strong>SOP:</strong> {p.rekomendasi}</p>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Rincian Khusus Zona Bahaya & Run-Up Tsunami */}
+        {isTsunami && (
+          <div className="space-y-2.5">
+            <div className="grid grid-cols-2 gap-2 text-center">
+              <div className="p-2.5 bg-[#0C1E2C] rounded-xl border border-cyan-800/40">
+                <span className="text-[10px] text-slate-400 uppercase font-mono block">Kawasan Rendaman</span>
+                <span className="text-sm font-bold text-cyan-300 font-mono mt-0.5 block">{p.tingkat_bahaya || 'KRB III TSUNAMI'}</span>
+              </div>
+              <div className="p-2.5 bg-[#0C1E2C] rounded-xl border border-cyan-800/40">
+                <span className="text-[10px] text-slate-400 uppercase font-mono block">Kedalaman Rendaman</span>
+                <span className="text-sm font-bold text-amber-300 font-mono mt-0.5 block">{p.kedalaman_rendaman || '> 3.0 Meter'}</span>
+              </div>
+            </div>
+
+            <div className="p-3 bg-[#111A26] rounded-xl border border-[#233547] space-y-1.5 text-xs text-slate-300 leading-relaxed">
+              <div className="font-bold text-cyan-300 flex items-center gap-1.5">
+                <Waves className="w-3.5 h-3.5" />
+                <span>Pedoman Keselamatan Inundasi Tsunami:</span>
+              </div>
+              <p>{p.dampak_fisik || 'Zona bahaya tinggi mengalami arus gelombang tsunami kuat dengan daya hancur infrastruktur tinggi dalam radius pesisir.'}</p>
+              <div className="p-2 bg-[#172332] rounded-lg border border-cyan-500/30 text-[11px] text-cyan-200 mt-2">
+                🛡️ <strong>Rute Evakuasi:</strong> {p.protokol_evakuasi || 'Segera evakuasi vertikal ke Gedung TES terdekat atau bergerak ke arah Timur melintasi Garis Batas Jalan Bypass Padang.'}
+              </div>
             </div>
           </div>
         )}

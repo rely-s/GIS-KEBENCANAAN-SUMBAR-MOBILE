@@ -70,6 +70,40 @@ SUMBAR_WEATHER_NODES = [
     {"code": "13.09.02.2001", "name": "Kab. Kepulauan Mentawai", "threat": "Gelombang Tinggi Samudera Hindia & Angin Kencang Pesisir"}
 ]
 
+def select_current_forecast(cuaca_days: list) -> dict:
+    """
+    Memilih slot prakiraan cuaca yang paling dekat dengan jam lokal saat ini.
+    """
+    if not cuaca_days:
+        return {}
+    all_slots = []
+    for day in cuaca_days:
+        if isinstance(day, list):
+            all_slots.extend(day)
+    if not all_slots:
+        return {}
+
+    now_utc = datetime.now(timezone.utc)
+    best_slot = all_slots[0]
+    min_diff = float("inf")
+
+    for slot in all_slots:
+        dt_str = slot.get("datetime") or slot.get("utc_datetime")
+        if dt_str:
+            try:
+                cleaned = dt_str.replace("Z", "+00:00")
+                if " " in cleaned and "+" not in cleaned:
+                    cleaned = cleaned.replace(" ", "T") + "+00:00"
+                slot_dt = datetime.fromisoformat(cleaned)
+                diff = abs((slot_dt - now_utc).total_seconds())
+                if diff < min_diff:
+                    min_diff = diff
+                    best_slot = slot
+            except Exception:
+                continue
+
+    return best_slot
+
 async def sync_bmkg_weather_alerts():
     """
     Mengambil prakiraan & kondisi cuaca real-time resmi dari BMKG Publik API
@@ -83,9 +117,9 @@ async def sync_bmkg_weather_alerts():
                 resp = await client.get(url)
                 if resp.status_code == 200:
                     data = resp.json()
-                    cuaca_list = data.get("data", [{}])[0].get("cuaca", [[]])[0]
-                    if cuaca_list:
-                        latest = cuaca_list[0]
+                    cuaca_days = data.get("data", [{}])[0].get("cuaca", [])
+                    latest = select_current_forecast(cuaca_days)
+                    if latest:
                         w_desc = latest.get("weather_desc", "Berawan")
                         temp = latest.get("t", 25)
                         tp = float(latest.get("tp", 0.0) or 0.0)
@@ -104,32 +138,32 @@ async def sync_bmkg_weather_alerts():
                         
                         # Formulasi Komunikasi Risiko (Actionable & Honest - Anti False Alarm)
                         if is_hujan_lebat:
-                            event_title = f"Peringatan Dini Hujan Lebat: Waspada Potensi {node['threat']}"
+                            event_title = f"Peringatan Dini Hujan Lebat: Potensi {node['threat']}"
                             description = (
-                                f"Stasiun Meteorologi BMKG Minangkabau mendeteksi hujan lebat/petir di {node['name']}. "
+                                f"Stasiun Meteorologi BMKG mendeteksi hujan lebat/petir di {node['name']}. "
                                 f"Curah hujan terukur {tp} mm/jam, kecepatan angin {ws} km/jam arah {wd}. "
                                 f"Masyarakat di bantaran sungai dan lereng tebing diimbau siaga terhadap potensi {node['threat']}."
                             )
                         elif is_hujan_sedang:
-                            event_title = f"Waspada Hujan Sedang: Pemantauan Debit Sungai di {node['name']}"
+                            event_title = f"Waspada Hujan Sedang: Pemantauan Debit Sungai ({node['name']})"
                             description = (
                                 f"Kondisi cuaca hujan intensitas sedang ({tp} mm/jam) di {node['name']}. "
                                 f"Suhu {temp}°C, angin {ws} km/jam ({wd}). "
-                                f"Diimbau memantau kenaikan permukaan air sungai dan stabilitas tanah lereng."
+                                f"Diimbau memantau kenaikan permukaan air sungai dan stabilitas lereng."
                             )
                         elif is_hujan_ringan:
-                            event_title = f"Prakiraan: Hujan Ringan di {node['name']}"
+                            event_title = f"Cuaca: Hujan Ringan di {node['name']}"
                             description = (
                                 f"Terpantau hujan ringan lokal ({w_desc}) di {node['name']}. "
                                 f"Suhu {temp}°C, kelembapan {hu}%, kecepatan angin {ws} km/jam ({wd}). "
                                 f"Aktivitas warga terpantau normal dan kondusif."
                             )
                         else:
-                            event_title = f"Prakiraan: {w_desc} di {node['name']}"
+                            event_title = f"Cuaca: {w_desc} di {node['name']}"
                             description = (
                                 f"Kondisi cuaca terpantau {w_desc} di {node['name']}. "
                                 f"Suhu {temp}°C, kelembapan {hu}%, kecepatan angin {ws} km/jam ({wd}). "
-                                f"Kondisi umum kondusif dan aman dari potensi bahaya hidrometeorologis."
+                                f"Kondisi umum kondusif dan terkendali."
                             )
 
                         headline = f"BMKG {node['name']}: {w_desc}, Suhu {temp}°C, Angin {ws} km/jam ({wd}), Curah Hujan {tp} mm/jam."

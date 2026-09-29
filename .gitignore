@@ -29,10 +29,14 @@ venv/
 .venv/
 ENV/
 
-# Node / Frontend
+# Node / Frontend / Mobile
 node_modules/
 frontend/dist/
 frontend/node_modules/
+mobile/node_modules/
+mobile/.expo/
+mobile/dist/
+mobile/web-build/
 .npm
 .eslintcache
 

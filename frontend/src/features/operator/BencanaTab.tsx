@@ -5,7 +5,14 @@ import {
   Crosshair, 
   FileSpreadsheet, 
   Edit3, 
-  RefreshCw 
+  RefreshCw,
+  MapPin,
+  Search,
+  Filter,
+  Image as ImageIcon,
+  X,
+  ExternalLink,
+  Upload
 } from 'lucide-react';
 import { WILAYAH_SUMBAR_LIST, type UserSession } from './constants';
 
@@ -17,6 +24,7 @@ interface BencanaTabProps {
   onBencanaChanged?: () => void;
   onRequestPickLocation?: (target: 'posko' | 'bencana') => void;
   pickedCoords?: { lat: number; lng: number } | null;
+  onFocusMapLocation?: (lat: number, lon: number, zoom?: number) => void;
   onClose?: () => void;
   onCloseParent?: () => void;
   setSuccessMsg: (msg: string | null) => void;
@@ -32,6 +40,7 @@ export const BencanaTab: React.FC<BencanaTabProps> = ({
   onBencanaChanged,
   onRequestPickLocation,
   pickedCoords,
+  onFocusMapLocation,
   onClose,
   onCloseParent,
   setSuccessMsg,
@@ -51,6 +60,11 @@ export const BencanaTab: React.FC<BencanaTabProps> = ({
   const [isAddingBencana, setIsAddingBencana] = useState(false);
   const [submittingBencana, setSubmittingBencana] = useState(false);
 
+  // Search & Filter State
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filterStatus, setFilterStatus] = useState<'semua' | 'terverifikasi' | 'menunggu'>('semua');
+  const [previewPhoto, setPreviewPhoto] = useState<{ url: string; title: string; desc?: string } | null>(null);
+
   // Form Input Kejadian Bencana
   const [jenisBencana, setJenisBencana] = useState('longsor');
   const [deskripsiBencana, setDeskripsiBencana] = useState('');
@@ -58,6 +72,33 @@ export const BencanaTab: React.FC<BencanaTabProps> = ({
   const [bencanaLon, setBencanaLon] = useState(pickedCoords ? String(pickedCoords.lng) : '100.4650');
   const [wilayahIdBencana, setWilayahIdBencana] = useState(1);
   const [statusVerifBencana, setStatusVerifBencana] = useState('terverifikasi');
+  const [fotoBase64, setFotoBase64] = useState<string | null>(null);
+  const [fotoPreviewUrl, setFotoPreviewUrl] = useState<string | null>(null);
+
+  // Handler file upload foto kejadian
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > 5 * 1024 * 1024) {
+        setErrorMsg('Ukuran file foto maksimal 5 MB.');
+        return;
+      }
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const base64 = reader.result as string;
+        setFotoBase64(base64);
+        setFotoPreviewUrl(base64);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleFocusOnMap = (lat?: number, lon?: number) => {
+    if (lat && lon && onFocusMapLocation) {
+      handleClose();
+      onFocusMapLocation(lat, lon, 14.5);
+    }
+  };
 
   // Form Disagregasi Korban & Kerusakan (Jitupasna BNPB)
   const [korbanMeninggal, setKorbanMeninggal] = useState(0);
@@ -97,7 +138,7 @@ export const BencanaTab: React.FC<BencanaTabProps> = ({
     setSuccessMsg(null);
 
     try {
-      const payload = {
+      const payload: any = {
         jenis_bencana: jenisBencana,
         wilayah_id: Number(wilayahIdBencana),
         lat: parseFloat(bencanaLat),
@@ -121,6 +162,10 @@ export const BencanaTab: React.FC<BencanaTabProps> = ({
         }
       };
 
+      if (fotoBase64) {
+        payload.foto_base64 = fotoBase64;
+      }
+
       const res = await authFetch('/api/bencana', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -137,6 +182,8 @@ export const BencanaTab: React.FC<BencanaTabProps> = ({
       );
       setIsAddingBencana(false);
       setDeskripsiBencana('');
+      setFotoBase64(null);
+      setFotoPreviewUrl(null);
       handleRefresh();
       if (onBencanaChanged) onBencanaChanged();
     } catch (err: any) {
@@ -350,6 +397,40 @@ export const BencanaTab: React.FC<BencanaTabProps> = ({
             </div>
           </div>
 
+          {/* DOKUMENTASI FOTO LAPANGAN (OPSIONAL) */}
+          <div className="p-3 rounded-xl bg-[#0F1720] border border-[#2D3F52] space-y-2">
+            <div className="flex items-center justify-between">
+              <label className="text-[11px] font-semibold text-slate-300 flex items-center gap-1.5">
+                <ImageIcon className="w-3.5 h-3.5 text-cyan-400" />
+                <span>Dokumentasi Visual Lapangan (Opsional)</span>
+              </label>
+              {fotoPreviewUrl && (
+                <button
+                  type="button"
+                  onClick={() => { setFotoBase64(null); setFotoPreviewUrl(null); }}
+                  className="text-[10px] text-rose-400 hover:text-rose-300 font-medium"
+                >
+                  Hapus Foto
+                </button>
+              )}
+            </div>
+
+            <div className="flex items-center gap-3">
+              <label className="cursor-pointer px-3 py-1.5 rounded-lg bg-[#141E28] hover:bg-[#1B2733] border border-dashed border-[#2D3F52] hover:border-cyan-500/50 text-slate-300 text-xs flex items-center gap-2 transition">
+                <Upload className="w-3.5 h-3.5 text-cyan-400" />
+                <span>{fotoPreviewUrl ? 'Ganti Berkas Foto' : 'Pilih Berkas Foto (.jpg, .png, maks 5MB)'}</span>
+                <input type="file" accept="image/*" onChange={handleFileChange} className="hidden" />
+              </label>
+
+              {fotoPreviewUrl && (
+                <div className="flex items-center gap-2">
+                  <img src={fotoPreviewUrl} alt="Preview Foto" className="w-10 h-10 object-cover rounded border border-cyan-500/50" />
+                  <span className="text-[10.5px] text-emerald-400 font-mono">Foto siap dilampirkan</span>
+                </div>
+              )}
+            </div>
+          </div>
+
           {/* Rincian Dampak & Korban Lengkap (Standar Jitupasna BNPB) */}
           <div className="p-3.5 rounded-xl bg-[#0F1720] border border-[#2D3F52] space-y-3">
             <span className="text-[11px] font-mono uppercase text-amber-300 font-bold block flex items-center gap-1.5">
@@ -510,6 +591,46 @@ export const BencanaTab: React.FC<BencanaTabProps> = ({
         </form>
       )}
 
+      {/* FILTER & PENCARIAN DAFTAR KEJADIAN BENCANA */}
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 bg-[#0F1720] p-2.5 rounded-xl border border-[#243444]">
+        <div className="relative flex-1">
+          <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+          <input
+            type="text"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            placeholder="Cari wilayah (mis: Pasaman, Padang), jenis bencana, atau deskripsi..."
+            className="w-full bg-[#141E28] border border-[#2D3F52] rounded-lg pl-9 pr-3 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-400"
+          />
+        </div>
+
+        <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 bg-[#141E28] border border-[#2D3F52] rounded-lg px-2.5 py-1 text-xs">
+            <Filter className="w-3.5 h-3.5 text-slate-400" />
+            <select
+              value={filterStatus}
+              onChange={(e) => setFilterStatus(e.target.value as any)}
+              className="bg-transparent text-slate-200 text-xs focus:outline-none cursor-pointer"
+            >
+              <option value="semua" className="bg-[#141E28]">Semua Status</option>
+              <option value="terverifikasi" className="bg-[#141E28]">Terverifikasi</option>
+              <option value="menunggu" className="bg-[#141E28]">Menunggu</option>
+            </select>
+          </div>
+
+          <span className="text-[11px] font-mono text-slate-400 px-2 py-1 rounded bg-[#141E28] border border-[#2D3F52] whitespace-nowrap">
+            {bencanaList.filter((b) => {
+              const matchSearch = searchTerm === '' || 
+                (b.jenis_bencana && b.jenis_bencana.toLowerCase().includes(searchTerm.toLowerCase())) ||
+                (b.wilayah?.nama && b.wilayah.nama.toLowerCase().includes(searchTerm.toLowerCase())) ||
+                (b.deskripsi && b.deskripsi.toLowerCase().includes(searchTerm.toLowerCase()));
+              const matchStatus = filterStatus === 'semua' || b.status_verifikasi === filterStatus;
+              return matchSearch && matchStatus;
+            }).length} / {bencanaList.length} Kejadian
+          </span>
+        </div>
+      </div>
+
       {/* DAFTAR KEJADIAN BENCANA TABEL */}
       <div className="bg-[#141E28] rounded-xl border border-[#243444] overflow-hidden">
         <div className="max-h-80 overflow-y-auto">
@@ -524,51 +645,93 @@ export const BencanaTab: React.FC<BencanaTabProps> = ({
               </tr>
             </thead>
             <tbody className="divide-y divide-[#243444]">
-              {bencanaList.map((b) => {
-                const isVerified = b.status_verifikasi === 'terverifikasi';
-                const d = b.dampak || {};
-                return (
-                  <tr key={b.id} className="hover:bg-[#1B2733]/50 transition-colors">
-                    <td className="py-2 px-3">
-                      <div className="font-bold text-white uppercase text-[11px]">{b.jenis_bencana}</div>
-                      <div className="text-[10px] text-slate-400">{b.wilayah?.nama || 'Sumatera Barat'}</div>
-                    </td>
-                    <td className="py-2 px-3 text-[11px] font-mono text-slate-300">
-                      {b.tanggal_kejadian ? new Date(b.tanggal_kejadian).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' }) : '-'}
-                    </td>
-                    <td className="py-2 px-3">
-                      <div className="flex items-center gap-2 font-mono text-[10px]">
-                        <span className="text-rose-400 font-bold" title="Meninggal">{d.korban_meninggal || 0} MD</span>
-                        <span className="text-amber-400" title="Luka-luka">{d.korban_luka || 0} LR</span>
-                        <span className="text-cyan-400" title="Pengungsi">{d.jumlah_pengungsi || 0} Jiwa</span>
-                        {d.kerugian_rp > 0 && (
-                          <span className="text-emerald-400 font-bold" title="Kerugian">
-                            Rp {(d.kerugian_rp / 1_000_000).toFixed(0)} Jt
-                          </span>
-                        )}
-                      </div>
-                    </td>
-                    <td className="py-2 px-3">
-                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
-                        isVerified
-                          ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
-                          : 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
-                      }`}>
-                        {b.status_verifikasi}
-                      </span>
-                    </td>
-                    <td className="py-2 px-3 text-right">
-                      <button
-                        onClick={() => handleOpenEditDampak(b)}
-                        className="px-2.5 py-1 rounded bg-[#0F1720] hover:bg-[#243444] border border-[#2D3F52] text-[10px] text-amber-300 font-semibold flex items-center gap-1 ml-auto"
-                      >
-                        <Edit3 className="w-3 h-3" />
-                        <span>Edit Dampak</span>
-                      </button>
-                    </td>
-                  </tr>
-                );
-              })}
+              {bencanaList
+                .filter((b) => {
+                  const matchSearch = searchTerm === '' || 
+                    (b.jenis_bencana && b.jenis_bencana.toLowerCase().includes(searchTerm.toLowerCase())) ||
+                    (b.wilayah?.nama && b.wilayah.nama.toLowerCase().includes(searchTerm.toLowerCase())) ||
+                    (b.deskripsi && b.deskripsi.toLowerCase().includes(searchTerm.toLowerCase()));
+                  const matchStatus = filterStatus === 'semua' || b.status_verifikasi === filterStatus;
+                  return matchSearch && matchStatus;
+                })
+                .map((b) => {
+                  const isVerified = b.status_verifikasi === 'terverifikasi';
+                  const d = b.dampak || {};
+                  const hasCoords = b.lat && b.lon;
+
+                  return (
+                    <tr key={b.id} className="hover:bg-[#1B2733]/50 transition-colors">
+                      <td className="py-2 px-3">
+                        <div className="flex items-center gap-2">
+                          {b.foto_url && (
+                            <button
+                              type="button"
+                              onClick={() => setPreviewPhoto({
+                                url: b.foto_url,
+                                title: `${b.jenis_bencana?.toUpperCase()} - ${b.wilayah?.nama || 'Sumbar'}`,
+                                desc: b.deskripsi
+                              })}
+                              className="shrink-0 p-1 rounded bg-[#0F1720] border border-cyan-500/40 hover:border-cyan-400 text-cyan-300 hover:text-white transition"
+                              title="Lihat foto bukti dokumentasi"
+                            >
+                              <ImageIcon className="w-3.5 h-3.5 text-cyan-400" />
+                            </button>
+                          )}
+                          <div>
+                            <div className="font-bold text-white uppercase text-[11px]">{b.jenis_bencana}</div>
+                            <div className="text-[10px] text-slate-400">{b.wilayah?.nama || 'Sumatera Barat'}</div>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="py-2 px-3 text-[11px] font-mono text-slate-300">
+                        {b.tanggal_kejadian ? new Date(b.tanggal_kejadian).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' }) : '-'}
+                      </td>
+                      <td className="py-2 px-3">
+                        <div className="flex items-center gap-2 font-mono text-[10px]">
+                          <span className="text-rose-400 font-bold" title="Meninggal">{d.korban_meninggal || 0} MD</span>
+                          <span className="text-amber-400" title="Luka-luka">{d.korban_luka || 0} LR</span>
+                          <span className="text-cyan-400" title="Pengungsi">{d.jumlah_pengungsi || 0} Jiwa</span>
+                          {d.kerugian_rp > 0 && (
+                            <span className="text-emerald-400 font-bold" title="Kerugian">
+                              Rp {(d.kerugian_rp / 1_000_000).toFixed(0)} Jt
+                            </span>
+                          )}
+                        </div>
+                      </td>
+                      <td className="py-2 px-3">
+                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
+                          isVerified
+                            ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                            : 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                        }`}>
+                          {b.status_verifikasi}
+                        </span>
+                      </td>
+                      <td className="py-2 px-3 text-right">
+                        <div className="flex items-center justify-end gap-1.5">
+                          {hasCoords && onFocusMapLocation && (
+                            <button
+                              type="button"
+                              onClick={() => handleFocusOnMap(b.lat, b.lon)}
+                              className="px-2 py-1 rounded bg-[#0F1720] hover:bg-[#1C2836] border border-[#2D3F52] hover:border-cyan-500/50 text-cyan-300 text-[10.5px] font-medium flex items-center gap-1 transition-colors shadow-sm"
+                              title="Tutup dialog dan fokuskan peta ke lokasi kejadian ini"
+                            >
+                              <MapPin className="w-3 h-3 text-cyan-400" />
+                              <span>Peta</span>
+                            </button>
+                          )}
+                          <button
+                            onClick={() => handleOpenEditDampak(b)}
+                            className="px-2.5 py-1 rounded bg-[#0F1720] hover:bg-[#243444] border border-[#2D3F52] text-[10px] text-amber-300 font-semibold flex items-center gap-1 transition-colors"
+                          >
+                            <Edit3 className="w-3 h-3" />
+                            <span>Edit Dampak</span>
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
             </tbody>
           </table>
         </div>
@@ -642,6 +805,66 @@ export const BencanaTab: React.FC<BencanaTabProps> = ({
               </button>
             </div>
           </form>
+        </div>
+      )}
+
+      {/* LIGHTBOX MODAL UNTUK FOTO DOKUMENTASI KEJADIAN BENCANA */}
+      {previewPhoto && (
+        <div 
+          className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-in fade-in"
+          onClick={() => setPreviewPhoto(null)}
+        >
+          <div 
+            className="relative max-w-4xl w-full bg-[#0F1722] border border-[#2D3F52] rounded-2xl overflow-hidden shadow-2xl space-y-3"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between p-3.5 border-b border-[#243444] bg-[#141E28]">
+              <div>
+                <h4 className="text-xs font-bold text-white uppercase tracking-wider">{previewPhoto.title}</h4>
+                {previewPhoto.desc && (
+                  <p className="text-[11px] text-slate-300 line-clamp-1">{previewPhoto.desc}</p>
+                )}
+              </div>
+              <div className="flex items-center gap-2">
+                <a
+                  href={previewPhoto.url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="px-2.5 py-1 rounded bg-[#0F1720] hover:bg-[#1C2836] border border-[#2D3F52] text-slate-300 hover:text-white text-xs flex items-center gap-1 transition"
+                  title="Buka file asli di tab baru"
+                >
+                  <ExternalLink className="w-3.5 h-3.5" />
+                  <span>Tab Baru</span>
+                </a>
+                <button
+                  type="button"
+                  onClick={() => setPreviewPhoto(null)}
+                  className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 transition"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+            
+            <div className="p-2 sm:p-4 flex items-center justify-center bg-black/50 max-h-[70vh] overflow-hidden">
+              <img 
+                src={previewPhoto.url} 
+                alt={previewPhoto.title} 
+                className="max-h-[65vh] w-auto max-w-full object-contain rounded-lg"
+              />
+            </div>
+
+            <div className="p-3 bg-[#141E28] border-t border-[#243444] flex items-center justify-between text-[11px] text-slate-400 font-mono">
+              <span>Dokumentasi Visual Resmi Lapangan Pusdalops BPBD</span>
+              <button 
+                type="button"
+                onClick={() => setPreviewPhoto(null)}
+                className="px-3 py-1 rounded bg-slate-800 hover:bg-slate-700 text-white font-sans text-xs transition"
+              >
+                Tutup
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

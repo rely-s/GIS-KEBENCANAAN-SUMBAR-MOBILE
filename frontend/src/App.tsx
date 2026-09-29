@@ -143,14 +143,31 @@ export function App() {
     }
   });
 
-  // Auto-dismiss realtime notification setelah 10 detik
+  // Support Handoff dari Aplikasi Mobile: ?view=mobile_lite&lat=...&lon=...&zoom=...
+  const [isMobileLiteView, setIsMobileLiteView] = useState(false);
+
   useEffect(() => {
-    if (!realtimeNotification) return;
-    const timer = setTimeout(() => {
-      setRealtimeNotification(null);
-    }, 10000);
-    return () => clearTimeout(timer);
-  }, [realtimeNotification]);
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const viewParam = params.get('view');
+      const latParam = params.get('lat');
+      const lonParam = params.get('lon');
+      const zoomParam = params.get('zoom');
+
+      if (viewParam === 'mobile_lite') {
+        setIsMobileLiteView(true);
+      }
+      if (latParam && lonParam) {
+        const parsedLat = parseFloat(latParam);
+        const parsedLon = parseFloat(lonParam);
+        const parsedZoom = zoomParam ? parseFloat(zoomParam) : 15;
+        if (!isNaN(parsedLat) && !isNaN(parsedLon)) {
+          setFlyToCoords({ lat: parsedLat, lng: parsedLon, zoom: parsedZoom });
+        }
+      }
+    } catch (_) {}
+  }, []);
+
 
   const distanceToSumbar = useMemo(() => {
     if (!gempaData?.lat || !gempaData?.lon) return 0;
@@ -312,15 +329,16 @@ export function App() {
 
   // 1b. Fetch Data Fasilitas SITREP untuk Sinkronisasi Presisi Layer & Tab Evaluasi
   useEffect(() => {
-    fetch('/api/admin/sitrep')
+    fetch('/api/sitrep/ringkasan')
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
-        if (data && data.fasilitas) {
+        const counts = data?.kpi || data?.fasilitas;
+        if (counts) {
           setFacilityCounts({
-            posko: data.fasilitas.posko_pengungsi_count ?? 18,
-            tes: data.fasilitas.shelter_tes_count ?? 7,
-            faskes: data.fasilitas.faskes_count ?? 1,
-            total: data.fasilitas.total_titik_evakuasi ?? 26,
+            posko: counts.posko_pengungsi_count ?? counts.posko ?? 18,
+            tes: counts.shelter_tes_count ?? counts.tes ?? 7,
+            faskes: counts.faskes_count ?? counts.faskes ?? 1,
+            total: counts.total_titik_evakuasi ?? counts.total ?? 26,
           });
         }
       })
@@ -479,16 +497,18 @@ export function App() {
     setIsUnifiedDrawerOpen(false);
     setLoadingDampak(true);
 
-    // FIX: Jika properties sudah mengandung koordinat, flyTo langsung sebelum fetch selesai
+    // Jika properties sudah mengandung koordinat, flyTo dengan zoom adaptif (level kabupaten ~9.5, kecamatan ~12.5)
     if (properties?.lat && properties?.lon) {
+      const isSubdistrict = Boolean(properties.parent_nama || properties.kabupaten || properties.parent_id);
+      const targetZoom = properties.zoom || (isSubdistrict ? 12.5 : 9.5);
       setFlyToCoords({ 
         lat: Number(properties.lat), 
         lng: Number(properties.lon), 
-        zoom: properties.zoom || 12.5 
+        zoom: targetZoom 
       });
       // Load batas kecamatan jika ada info kabupaten induk
-      const parentNama = properties.parent_nama || properties.kabupaten;
-      const parentId = properties.parent_id;
+      const parentNama = properties.parent_nama || properties.kabupaten || properties.nama;
+      const parentId = properties.parent_id || properties.id;
       if (parentNama || parentId) {
         loadKotaBoundaries(parentNama || '', parentId);
       }
@@ -499,9 +519,10 @@ export function App() {
       .then((data: WilayahDampakData | null) => {
         if (data && data.nama) {
           setWilayahDampak(data);
-          // FIX: Gunakan koordinat center dari response API jika tersedia (lebih akurat)
-          if (data.center && data.center.lat && data.center.lng) {
-            setFlyToCoords({ lat: data.center.lat, lng: data.center.lng, zoom: 12.5 });
+          // Jika koordinat center tersedia dari API dan belum ada koordinat properties sebelumnya
+          if (data.center && data.center.lat && data.center.lng && (!properties?.lat || !properties?.lon)) {
+            const isSubdistrict = Boolean(data.parent_nama && data.parent_nama !== 'Provinsi Sumatera Barat');
+            setFlyToCoords({ lat: data.center.lat, lng: data.center.lng, zoom: isSubdistrict ? 12.5 : 9.6 });
           }
         } else {
           // Fallback data tangguh agar tidak memicu blank panel
@@ -591,8 +612,9 @@ export function App() {
     setActiveKecamatanInfo(null);
     setIsUnifiedDrawerOpen(false);
 
-    // 1. Direct flyTo ke lokasi Kota/Kabupaten
-    setFlyToCoords({ lat: kota.lat, lng: kota.lon, zoom: 11.5 });
+    // 1. Direct flyTo ke lokasi Kota/Kabupaten dengan zoom adaptif
+    const isKabupaten = kota.nama.toLowerCase().includes('kab');
+    setFlyToCoords({ lat: kota.lat, lng: kota.lon, zoom: isKabupaten ? 9.2 : 11.0 });
 
     // 2. Memuat batas seluruh kecamatan di dalam kabupaten/kota tersebut (Garis tempat lain di-hide)
     loadKotaBoundaries(kota.nama, kota.id);
@@ -886,11 +908,11 @@ export function App() {
 
   const handleAncamanClick = (info: any) => {
     setSelectedAncamanSheet({
-      tipe: info.jenis || 'sesar',
-      judul: info.nama || 'Ancaman Geologis',
-      subJudul: info.deskripsi,
-      badge: (info.jenis || '').toUpperCase(),
-      properties: info.metadata || {},
+      tipe: info.tipe || info.jenis || 'sesar',
+      judul: info.judul || info.nama || 'Ancaman Geologis',
+      subJudul: info.subJudul || info.deskripsi,
+      badge: info.badge || (info.tipe || info.jenis || '').toUpperCase(),
+      properties: info.properties || info.metadata || {},
     });
     setSelectedPoskoSheet(null);
     setSelectedJalanSheet(null);
@@ -900,6 +922,21 @@ export function App() {
     <div className="relative w-screen h-[100dvh] overflow-hidden bg-[#0F1720] font-body text-slate-100 select-none">
       {/* PWA Indikator Status Offline */}
       <OfflineBanner />
+
+      {/* Mobile Lite View Banner Handoff */}
+      {isMobileLiteView && (
+        <div className="absolute top-14 left-1/2 transform -translate-x-1/2 z-50 bg-slate-900/95 border border-orange-500/50 text-white px-4 py-1.5 rounded-full shadow-2xl flex items-center gap-2 text-xs backdrop-blur-md">
+          <span className="w-2 h-2 rounded-full bg-orange-500 animate-pulse"></span>
+          <span className="font-semibold text-orange-400">Mode Mobile Taktis:</span>
+          <span>Fokus Titik Evakuasi Lapangan</span>
+          <button 
+            onClick={() => setIsMobileLiteView(false)} 
+            className="ml-2 text-slate-400 hover:text-white font-bold"
+          >
+            ✕
+          </button>
+        </div>
+      )}
 
       {/* 1. HEADER UTAMA (Floating Ramping <= 52px di Atas Peta) */}
       <header className="absolute top-0 left-0 right-0 z-20 pointer-events-none p-2 sm:p-2.5 flex items-center justify-between gap-2">
@@ -929,18 +966,15 @@ export function App() {
 
           {/* Teks Identitas */}
           <div className="min-w-0">
-            <div className="flex items-center gap-1.5">
+            <div className="flex items-center gap-2">
               <h1 className="text-xs sm:text-sm font-black tracking-tight text-white font-display uppercase truncate">
-                GIS Kebencanaan
+                GIS Kebencanaan <span className="text-slate-300 font-medium normal-case text-[11px] sm:text-xs">Sumatera Barat</span>
               </h1>
-              <span className="px-1.5 py-0.2 text-[9px] font-mono font-bold rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 shrink-0">
-                PROV. SUMBAR
-              </span>
               <span 
-                className={`px-1.5 py-0.2 text-[9px] font-mono font-bold rounded border shrink-0 hidden xs:flex items-center gap-1 ${
+                className={`px-1.5 py-0.5 text-[9px] font-mono font-medium rounded border shrink-0 hidden xs:flex items-center gap-1 ${
                   isSSEConnected
-                    ? 'bg-emerald-950/60 border-emerald-500/50 text-emerald-300'
-                    : 'bg-amber-950/60 border-amber-500/50 text-amber-300'
+                    ? 'bg-emerald-950/40 border-emerald-500/40 text-emerald-300'
+                    : 'bg-amber-950/40 border-amber-500/40 text-amber-300'
                 }`} 
                 title={isSSEConnected ? 'Real-Time EWS Stream Terhubung (SSE Live)' : 'Menghubungkan ke EWS Stream...'}
               >
@@ -948,8 +982,8 @@ export function App() {
                 {isSSEConnected ? 'EWS LIVE' : 'CONNECTING'}
               </span>
             </div>
-            <p className="text-[10px] text-slate-300 font-mono hidden sm:block truncate">
-              BPBD Prov. Sumbar &amp; Riset LPPM UPI YPTK
+            <p className="text-[10px] text-slate-400 font-sans tracking-wide hidden sm:block truncate">
+              BPBD Prov. Sumatera Barat • Kolaborasi Riset LPPM UPI YPTK
             </p>
           </div>
         </div>
@@ -1320,6 +1354,10 @@ export function App() {
           setPickingTarget(target);
           setIsPickingLocationOnMap(true);
           setIsOperatorModalOpen(false);
+        }}
+        onFocusMapLocation={(lat, lon, zoom) => {
+          setIsOperatorModalOpen(false);
+          setFlyToCoords({ lat, lng: lon, zoom: zoom || 14.5 });
         }}
       />
 

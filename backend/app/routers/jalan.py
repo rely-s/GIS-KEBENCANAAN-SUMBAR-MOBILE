@@ -35,7 +35,8 @@ class JalanPulihkanResponse(BaseModel):
     status: str
     pesan: str
 
-@router.get("")
+@router.get("", include_in_schema=True)
+@router.get("/", include_in_schema=False)
 async def list_jalan_terputus(db: AsyncSession = Depends(get_async_db)):
     """
     Endpoint Publik: Mengembalikan daftar ruas jalan terputus berstatus aktif 
@@ -77,6 +78,7 @@ async def list_jalan_terputus(db: AsyncSession = Depends(get_async_db)):
     }
 
 @router.post("", status_code=status.HTTP_201_CREATED)
+@router.post("/", status_code=status.HTTP_201_CREATED, include_in_schema=False)
 async def create_jalan_terputus(
     payload: JalanCreateRequest,
     request: Request,

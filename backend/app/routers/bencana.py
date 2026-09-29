@@ -70,7 +70,8 @@ class LaporWargaRequest(BaseModel):
     kontak_pelapor: Optional[str] = Field(default=None, max_length=30)
     foto_base64: Optional[str] = Field(default=None, description="Foto bukti visual (WebP/JPEG terkompresi)")
 
-@router.get("")
+@router.get("", include_in_schema=True)
+@router.get("/", include_in_schema=False)
 async def list_bencana(
     jenis: Optional[str] = Query(None, description="Filter jenis bencana"),
     tahun: Optional[int] = Query(None, description="Filter tahun"),
@@ -351,6 +352,7 @@ async def detail_bencana(
 # ENDPOINTS MUTASI (CREATE, UPDATE, VERIFIKASI, DELETE)
 # ============================================================================
 
+@router.post("/lapor", status_code=status.HTTP_201_CREATED)
 @router.post("/lapor-warga", status_code=status.HTTP_201_CREATED)
 async def lapor_bencana_warga(
     payload: LaporWargaRequest,
@@ -452,6 +454,7 @@ async def lapor_bencana_warga(
     }
 
 @router.post("", status_code=status.HTTP_201_CREATED)
+@router.post("/", status_code=status.HTTP_201_CREATED, include_in_schema=False)
 async def create_bencana(
     payload: BencanaCreateRequest,
     request: Request,

@@ -69,7 +69,8 @@ class PoskoStatusRequest(BaseModel):
 # ENDPOINTS PUBLIK & BACA (READ)
 # ============================================================================
 
-@router.get("")
+@router.get("", include_in_schema=True)
+@router.get("/", include_in_schema=False)
 async def list_semua_posko(
     jenis: Optional[str] = None,
     include_nonaktif: bool = False,
@@ -279,6 +280,7 @@ async def detail_posko(
 # ============================================================================
 
 @router.post("", status_code=status.HTTP_201_CREATED)
+@router.post("/", status_code=status.HTTP_201_CREATED, include_in_schema=False)
 async def create_posko(
     payload: PoskoCreateRequest,
     request: Request,

@@ -9,7 +9,8 @@ from app.models.pengguna import Pengguna
 
 router = APIRouter(prefix="/admin", tags=["Administrasi & Eksekutif Pimpinan"])
 
-@router.get("/pengguna")
+@router.get("/pengguna", include_in_schema=True)
+@router.get("/pengguna/", include_in_schema=False)
 async def list_pengguna(
     current_user: Pengguna = Depends(require_role(["admin", "super_admin"])),
     db: AsyncSession = Depends(get_async_db)
@@ -41,7 +42,8 @@ async def list_pengguna(
         })
     return {"data": users}
 
-@router.get("/statistik")
+@router.get("/statistik", include_in_schema=True)
+@router.get("/statistik/", include_in_schema=False)
 async def get_ringkasan_eksekutif(
     current_user: Pengguna = Depends(require_role(["pimpinan", "admin", "operator"])),
     db: AsyncSession = Depends(get_async_db)
@@ -112,7 +114,8 @@ async def get_ringkasan_eksekutif(
         "prioritas_wilayah": top_wilayah
     }
 
-@router.get("/verifikasi-queue")
+@router.get("/verifikasi-queue", include_in_schema=True)
+@router.get("/verifikasi-queue/", include_in_schema=False)
 async def get_verifikasi_queue(
     current_user: Pengguna = Depends(require_role(["admin", "pimpinan", "operator"])),
     db: AsyncSession = Depends(get_async_db)
@@ -155,7 +158,8 @@ async def get_verifikasi_queue(
         "data": items
     }
 
-@router.get("/audit-logs")
+@router.get("/audit-logs", include_in_schema=True)
+@router.get("/audit-logs/", include_in_schema=False)
 async def list_audit_logs(
     limit: int = 50,
     current_user: Pengguna = Depends(require_role(["admin", "pimpinan"])),

@@ -43,6 +43,7 @@ interface OperatorModalProps {
   onBencanaChanged?: () => void;
   pickedCoords?: { lat: number; lng: number } | null;
   onRequestPickLocation?: (target: 'posko' | 'bencana') => void;
+  onFocusMapLocation?: (lat: number, lon: number, zoom?: number) => void;
   initialTab?: CommandTab;
 }
 
@@ -57,6 +58,7 @@ export const OperatorModal: React.FC<OperatorModalProps> = ({
   onBencanaChanged,
   pickedCoords,
   onRequestPickLocation,
+  onFocusMapLocation,
   initialTab = 'posko',
 }) => {
   // Login Form States
@@ -556,6 +558,7 @@ export const OperatorModal: React.FC<OperatorModalProps> = ({
                   onBencanaChanged={onBencanaChanged}
                   pickedCoords={pickedCoords}
                   onRequestPickLocation={onRequestPickLocation}
+                  onFocusMapLocation={onFocusMapLocation}
                   onClose={onClose}
                 />
               )}
@@ -583,6 +586,8 @@ export const OperatorModal: React.FC<OperatorModalProps> = ({
                   setErrorMsg={setErrorMsg}
                   setSuccessMsg={setSuccessMsg}
                   onBencanaChanged={onBencanaChanged}
+                  onFocusMapLocation={onFocusMapLocation}
+                  onClose={onClose}
                 />
               )}
 

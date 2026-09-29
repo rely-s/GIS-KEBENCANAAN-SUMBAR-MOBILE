@@ -69,16 +69,21 @@ export const SitrepModal: React.FC<SitrepModalProps> = ({ isOpen, onClose }) => 
     const targetId = bencanaId !== undefined ? bencanaId : selectedBencanaId;
     const query = targetId ? `?bencana_id=${targetId}` : '';
     const token = typeof window !== 'undefined' ? localStorage.getItem('gis_auth_token') : null;
-    fetch(`/api/admin/sitrep${query}`, {
+    const url = token ? `/api/admin/sitrep${query}` : `/api/sitrep/ringkasan${query}`;
+
+    fetch(url, {
       credentials: 'include',
       headers: {
         ...(token ? { Authorization: `Bearer ${token}` } : {})
       }
     })
       .then((res) => {
+        if (!token && res.ok) {
+          return res.json();
+        }
         if (res.status === 401 || res.status === 403) {
-          setAuthError(true);
-          return null;
+          // Fallback otomatis ke data publik resmi jika token kadaluarsa atau belum login
+          return fetch(`/api/sitrep/ringkasan${query}`).then((r) => (r.ok ? r.json() : null));
         }
         return res.ok ? res.json() : null;
       })
