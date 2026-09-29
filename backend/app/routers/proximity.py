@@ -175,10 +175,13 @@ async def calculate_proximity_threats(
                     threat_status = "ZONA_AMAN"
                     directive = "Lokasi berada di luar radius sempadan langsung ancaman bahaya."
 
+                canonical_type = "tsunami" if r.jenis in ("megathrust", "tsunami") else r.jenis
+
                 results.append({
                     "id": f"ancaman_{r.id}",
                     "name": r.nama,
-                    "type": r.jenis,
+                    "type": canonical_type,
+                    "raw_type": r.jenis,
                     "distance_meters": round(dist_m),
                     "distance_km": round(dist_m / 1000.0, 2),
                     "buffer_limit_meters": buf_m,
@@ -190,6 +193,45 @@ async def calculate_proximity_threats(
     except Exception as e:
         # Fallback jika terjadi kegagalan koneksi database
         pass
+
+    # Garansi 4 Pilar Ancaman Spasial Utama Sumbar (Tsunami, Sesar, Galodo, Banjir)
+    has_banjir = any(x["type"] == "banjir" for x in results)
+    if not has_banjir:
+        dist_banjir = haversine_distance(lat, lon, -0.9020, 100.3750)
+        dist_m = round(dist_banjir)
+        buf_m = 500
+        threat_status = "BAHAYA_LANGSUNG" if dist_m <= buf_m else ("WASPADA" if dist_m <= buf_m * 2.5 else "ZONA_AMAN")
+        results.append({
+            "id": "ancaman_banjir_kuranji",
+            "name": "Zona Sempadan Rawan Banjir DAS Kuranji",
+            "type": "banjir",
+            "distance_meters": dist_m,
+            "distance_km": round(dist_m / 1000.0, 2),
+            "buffer_limit_meters": buf_m,
+            "status": threat_status,
+            "description": "Daerah Aliran Sungai (DAS) Batang Kuranji dan Batang Arau berisiko luapan saat hujan intensitas tinggi.",
+            "actionable_directive": "Waspadai kenaikan debit air DAS Kuranji. Hindari beraktivitas di bantaran sungai saat hujan lebat.",
+            "nearest_point": {"lat": -0.9020, "lon": 100.3750}
+        })
+
+    has_tsunami_coast = any(x.get("id") == "ancaman_tsunami_coast" or (x["type"] == "tsunami" and x["distance_km"] < 20) for x in results)
+    if not has_tsunami_coast and abs(lat - (-0.95)) < 1.0 and abs(lon - 100.36) < 1.0:
+        dist_coast = haversine_distance(lat, lon, -0.9320, 100.3450)
+        dist_m = round(dist_coast)
+        buf_m = 1000
+        threat_status = "BAHAYA_LANGSUNG" if dist_m <= buf_m else ("WASPADA" if dist_m <= 3000 else "ZONA_AMAN")
+        results.append({
+            "id": "ancaman_tsunami_coast",
+            "name": "Zona Sempadan Pesisir Pantai Padang (Tsunami)",
+            "type": "tsunami",
+            "distance_meters": dist_m,
+            "distance_km": round(dist_m / 1000.0, 2),
+            "buffer_limit_meters": buf_m,
+            "status": threat_status,
+            "description": "Kawasan pesisir pantai barat Sumatera Barat berisiko rendaman gelombang laut pasca gempa besar.",
+            "actionable_directive": "Jika merasakan guncangan gempa kuat >20 detik, segera lari menjauhi pantai menuju shelter TES vertikal (>15 mdpl).",
+            "nearest_point": {"lat": -0.9320, "lon": 100.3450}
+        })
 
     # Fallback ke katalog memori jika tabel database kosong atau query gagal
     if not results:
@@ -218,10 +260,12 @@ async def calculate_proximity_threats(
                 threat_status = "ZONA_AMAN"
                 directive = "Lokasi berada di luar radius sempadan langsung ancaman bahaya."
 
+            canonical_type = "tsunami" if threat["type"] in ("megathrust", "tsunami") else threat["type"]
+
             results.append({
                 "id": threat["id"],
                 "name": threat["name"],
-                "type": threat["type"],
+                "type": canonical_type,
                 "distance_meters": round(min_dist),
                 "distance_km": round(min_dist / 1000.0, 2),
                 "buffer_limit_meters": buffer_m,

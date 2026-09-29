@@ -72,6 +72,9 @@ class PoskoStatusRequest(BaseModel):
 @router.get("", include_in_schema=True)
 @router.get("/", include_in_schema=False)
 async def list_semua_posko(
+    lat: Optional[float] = Query(None, description="Latitude pengguna untuk sorting jarak terdekat"),
+    lon: Optional[float] = Query(None, description="Longitude pengguna untuk sorting jarak terdekat"),
+    limit: Optional[int] = Query(None, ge=1, le=100, description="Batas jumlah hasil"),
     jenis: Optional[str] = None,
     include_nonaktif: bool = False,
     wilayah_id: Optional[int] = None,
@@ -81,7 +84,7 @@ async def list_semua_posko(
 ):
     """
     Mengembalikan daftar posko/shelter/sirine dalam format GeoJSON FeatureCollection.
-    Mendukung filter jenis, wilayah, id_kecamatan hasil filter bertingkat, dan status ketersediaan.
+    Mendukung sorting jarak spasial terdekat jika parameter lat dan lon diberikan.
     """
     conditions = []
     params: Dict[str, Any] = {}
@@ -102,21 +105,41 @@ async def list_semua_posko(
         params["search"] = f"%{search.lower()}%"
 
     where_clause = f"WHERE {' AND '.join(conditions)}" if conditions else ""
+
+    has_coords = lat is not None and lon is not None
+    if has_coords:
+        params["lat"] = lat
+        params["lon"] = lon
+        dist_field = ", ST_Distance(lokasi::geography, ST_SetSRID(ST_MakePoint(:lon, :lat), 4326)::geography) AS jarak_meter"
+        order_clause = "ORDER BY lokasi <-> ST_SetSRID(ST_MakePoint(:lon, :lat), 4326) ASC"
+    else:
+        dist_field = ", NULL AS jarak_meter"
+        order_clause = "ORDER BY id DESC"
+
+    limit_clause = ""
+    if limit is not None:
+        params["limit"] = limit
+        limit_clause = "LIMIT :limit"
+
     query = text(f"""
         SELECT 
             id, nama, jenis, kapasitas, fasilitas, kontak_pic, kontak_telepon, status, wilayah_id, id_kecamatan,
             jumlah_pengungsi_pria, jumlah_pengungsi_wanita, jumlah_pengungsi_lansia, jumlah_pengungsi_balita, jumlah_pengungsi_disabilitas,
             ketersediaan_air_bersih, ketersediaan_dapur_umum, ketersediaan_tenaga_medis,
-            ST_X(lokasi) AS lon, ST_Y(lokasi) AS lat, updated_at
+            ST_X(lokasi) AS lon, ST_Y(lokasi) AS lat, updated_at{dist_field}
         FROM posko_evakuasi
         {where_clause}
-        ORDER BY id DESC;
+        {order_clause}
+        {limit_clause};
     """)
     result = await db.execute(query, params)
     rows = result.fetchall()
 
     features = []
     for r in rows:
+        j_meter = round(float(r.jarak_meter)) if getattr(r, 'jarak_meter', None) is not None else None
+        j_km = round(j_meter / 1000.0, 2) if j_meter is not None else None
+
         features.append({
             "type": "Feature",
             "geometry": {
@@ -134,6 +157,8 @@ async def list_semua_posko(
                 "status": r.status,
                 "wilayah_id": r.wilayah_id,
                 "id_kecamatan": r.id_kecamatan,
+                "jarak_meter": j_meter,
+                "jarak_km": j_km,
                 "jumlah_pengungsi_pria": r.jumlah_pengungsi_pria or 0,
                 "jumlah_pengungsi_wanita": r.jumlah_pengungsi_wanita or 0,
                 "jumlah_pengungsi_lansia": r.jumlah_pengungsi_lansia or 0,
