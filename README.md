@@ -16,7 +16,7 @@
 > 🏛️ **Badan Penanggulangan Bencana Daerah (BPBD) Provinsi Sumatera Barat**  
 > 🎓 **Lembaga Penelitian dan Pengabdian kepada Masyarakat (LPPM) Universitas Putra Indonesia "YPTK" Padang**  
 >
-> *Platform Satu Data & Operasi Geospasial Kebencanaan Multi-Kanal (WebGIS Dashboard Pusdalops & Mobile App Taktis Siaga Sumbar). Dilengkapi Navigasi Evakuasi Multi-Moda Sadar-Blokade, Radar Ancaman Geodesik PostGIS WGS84, 12 Lapisan Spasial Operasional & Katalog InaRISK BNPB ($R = H \times V / C$), Pemantauan 19 Simpul Cuaca Real-Time Resmi BMKG Se-Sumbar, Standardisasi Kartografi Kemanusiaan Internasional (UN OCHA / BNPB / ISO), RBAC 4 Tingkatan Pusdalops-Pimpinan, Crowdsourcing Lapor Bencana dengan Kompresi WebP On-Device, serta Otomasi Situation Report (SITREP).*
+> *Platform Satu Data & Operasi Geospasial Kebencanaan Multi-Kanal (WebGIS Dashboard Pusdalops & Mobile App Taktis Siaga Sumbar). Dilengkapi Navigasi Evakuasi Multi-Moda Sadar-Blokade, Radar Ancaman Geodesik PostGIS WGS84, 12 Lapisan Spasial Operasional & Katalog InaRISK BNPB ($R = H \times V / C$), Jaringan 5 Stasiun Pengamatan Resmi BMKG & Prakiraan Cuaca Digital 19 Kab/Kota Se-Sumbar, Standardisasi Kartografi Kemanusiaan Internasional (UN OCHA / BNPB / ISO), RBAC 4 Tingkatan Pusdalops-Pimpinan, Crowdsourcing Lapor Bencana dengan Kompresi WebP On-Device, serta Otomasi Situation Report (SITREP).*
 
 ---
 
@@ -26,7 +26,7 @@
 2. [Arsitektur Sistem & Spesifikasi Teknologi](#2-arsitektur-sistem--spesifikasi-teknologi)
 3. [📱 Platform Mobile Taktis: Siaga Sumbar (React Native & Expo)](#3--platform-mobile-taktis-siaga-sumbar-react-native--expo)
 4. [Inventarisasi Data Geospasial & Sensor Real-Time](#4-inventarisasi-data-geospasial--sensor-real-time)
-5. [Jaringan 19 Simpul Cuaca Resmi BMKG Se-Sumbar](#5-jaringan-19-simpul-cuaca-resmi-bmkg-se-sumbar)
+5. [Jaringan 5 Stasiun Resmi BMKG & Prakiraan Cuaca Digital 19 Kab/Kota](#5-jaringan-5-stasiun-resmi-bmkg--prakiraan-cuaca-digital-19-kabkota)
 6. [Integritas Data, Model Indikatif & Batasan Sistem](#6-integritas-data-model-indikatif--batasan-sistem)
 7. [Standardisasi UI/UX & Aksesibilitas WCAG 2.1 AA](#7-standardisasi-uiux--aksesibilitas-wcag-21-aa)
 8. [Hierarki Hak Akses (RBAC) & Manajemen Pusdalops](#8-hierarki-hak-akses-rbac--manajemen-pusdalops)
@@ -81,7 +81,7 @@ Sistem mengadopsi arsitektur terpadu multi-kanal (*Decoupled Multi-Client Archit
 │ PostGIS Database (Port 5433) │ │ Engine Routing        │ │ Sensor Eksternal BMKG   │
 │ Dedicated Instance           │ │ OSRM + Shapely Avoid  │ │ · BMKG TEWS Gempa Real  │
 │ · ancaman_geologis           │ │ (Multi-Moda Mobil &   │ │ · Nowcast Cuaca 19 ADM4 │
-│ · posko_shelter              │ │  Jalan Kaki TES)      │ │ · Feed Resmi BIM        │
+│ · posko_shelter              │ │  Jalan Kaki TES)      │ │ · 5 Stasiun Resmi BMKG  │
 │ · jalan_terputus             │ │ · Detour Jalan Putus  │ │ · Ingestion Tiap Jam    │
 └──────────────────────────────┘ └───────────────────────┘ └─────────────────────────┘
 ```
@@ -190,46 +190,63 @@ Platform WebGIS memadukan **7 klaster data geospasial resmi, autentik, dan terku
 │ 6. BMKG TEWS       │ Sensor seismik gempa real-time    │ Model: `gempa_bmkg`                    │
 │    (Sensor BMKG)   │ Episentrum, magnitudo, MMI        │ Ingestion otomatis & stream SSE        │
 ├────────────────────┼───────────────────────────────────┼────────────────────────────────────────┤
-│ 7. Cuaca 19 Wilayah│ 19 stasiun pengamatan BMKG        │ Model: `peringatan_cuaca_bmkg`         │
-│    (Stasiun BIM)   │ Curah hujan mm/jam, suhu, angin   │ Kode ADM4 wilayah Kemendagri           │
+│ 7. Stasiun & Cuaca │ 5 Stasiun Resmi BMKG (Faktual) &  │ PostGIS: `stasiun_bmkg`                │
+│    (BMKG & InaTEWS)│ Prakiraan Cuaca Digital 19 ADM4   │ Model: `peringatan_cuaca_bmkg`         │
 └────────────────────┴───────────────────────────────────┴────────────────────────────────────────┘
 ```
 
 ---
 
-## 5. Jaringan 19 Simpul Cuaca Resmi BMKG Se-Sumbar
+## 5. Jaringan 5 Stasiun Resmi BMKG & Prakiraan Cuaca Digital 19 Kab/Kota
 
-Platform melakukan sinkronisasi otomatis setiap jam terhadap 19 simpul pengamatan cuaca resmi BMKG:
+Sistem menerapkan prinsip **Integritas Data Tanpa Halusinasi (*Zero Hallucination*)** dengan membedakan secara tegas antara **Stasiun Fisik Sensor Pemantauan (*Ground Stations*)** dan **Layanan Diseminasi Prakiraan Cuaca Digital Wilayah Administratif**:
 
-| No | Wilayah Administratif | Stasiun / Titik Rujukan BMKG | Kode Wilayah |
-|:---:|---|---|:---:|
-| 1 | **Kota Padang** | Stasiun Meteorologi Maritim Teluk Bayur / Stasiun Klimatologi Padang Pariaman | `13.71` |
-| 2 | **Kota Bukittinggi** | Stasiun Geofisika Sianok Bukittinggi | `13.75` |
-| 3 | **Kota Padang Panjang** | Stasiun Pengamatan Lereng Marapi-Singgalang | `13.74` |
-| 4 | **Kota Solok** | Simpul Agroklimat Lembah Nan Indah | `13.73` |
-| 5 | **Kota Sawahlunto** | Simpul Pemantauan Ombilin | `13.72` |
-| 6 | **Kota Payakumbuh** | Simpul Pengamatan Dataran Tinggi Luak Limopuluah | `13.76` |
-| 7 | **Kota Pariaman** | Pos Meteorologi Stasiun BIM Pesisir Pariaman | `13.77` |
-| 8 | **Kab. Agam** | Stasiun Pemantauan Marapi PVMBG & Pos Agam | `13.06` |
-| 9 | **Kab. Tanah Datar** | Simpul Batusangkar / Batang Gadih | `13.04` |
-| 10 | **Kab. Padang Pariaman** | Stasiun Meteorologi Minangkabau (BIM) Ketaping | `13.05` |
-| 11 | **Kab. Pesisir Selatan** | Simpul Pesisir Painan & Tarusan | `13.01` |
-| 12 | **Kab. Solok** | Simpul Danau Singkarak & Arosuka | `13.02` |
-| 13 | **Kab. Solok Selatan** | Simpul Muara Labuh & Lembah Gumanti | `13.11` |
-| 14 | **Kab. Pasaman** | Simpul Lubuk Sikaping | `13.08` |
-| 15 | **Kab. Pasaman Barat** | Simpul Simpang Empat & Pesisir Sasak | `13.12` |
-| 16 | **Kab. Lima Puluh Kota** | Simpul Sarilamak & Harau | `13.07` |
-| 17 | **Kab. Sijunjung** | Simpul Muaro Sijunjung | `13.03` |
-| 18 | **Kab. Dharmasraya** | Simpul Pulau Punjung | `13.10` |
-| 19 | **Kab. Kep. Mentawai** | Stasiun Pengamatan Maritim Tuapejat & Siberut | `13.09` |
+### A. 5 Stasiun Pengamatan Cuaca, Iklim & Geofisika Resmi BMKG di Sumatera Barat (Data Faktual)
+Secara institusional, BMKG memiliki **5 Unit Pelaksana Teknis (UPT) Stasiun Pengamatan Resmi** di wilayah Provinsi Sumatera Barat yang dipetakan sebagai lapisan spasial simpul sensor di peta WebGIS:
+
+| No | Nama Stasiun Resmi BMKG | Klasifikasi & Tipe | Kode WMO / ICAO | Lokasi Koordinat | Mandat & Tugas Operasional Utama |
+|:---:|---|---|:---:|:---:|---|
+| 1 | **Stasiun Meteorologi Kelas II Minangkabau** | Meteorologi Penerbangan & Permukaan | `96163` (WIPT) | Bandara Internasional Minangkabau (BIM), Ketaping, Kab. Padang Pariaman (`-0.7877, 100.2831`) | Pengamatan cuaca penerbangan, operasional Radar Cuaca Doppler, radiosonde, dan peringatan dini cuaca ekstrem (*nowcasting*). Status: Siaga 24 Jam. |
+| 2 | **Stasiun Geofisika Kelas I Padang Panjang** | Seismologi & Pusat Gempa Regional (PGR II) | `96171` (PPN) | Jl. St. Syahrir No. 243 Silaiang Bawah, Kota Padang Panjang (`-0.4673, 100.3956`) | Pusat Seismologi & Gempa Bumi Regional Sumbar, pemantauan sesar darat Semangko & megathrust, penerima diseminasi InaTEWS. Status: Siaga 24 Jam. |
+| 3 | **Stasiun Klimatologi Kelas II Sumatera Barat** | Agroklimatologi & Analisis Iklim | `96167` | Jl. Raya Padang - Bukittinggi KM 42, Sicincin, Kab. Padang Pariaman (`-0.5622, 100.2789`) | Pemantauan tren iklim, evaluasi Hari Tanpa Hujan (HTH), peringatan dini kekeringan, dan analisis potensi hidrometeorologis basah dasarian. Status: Siaga 24 Jam. |
+| 4 | **Stasiun Meteorologi Maritim Teluk Bayur** | Meteorologi Kelautan & Pelayaran | `96165` | Kawasan Pelabuhan Samudera Teluk Bayur, Kota Padang (`-0.9986, 100.3802`) | Pengamatan cuaca maritim perairan Samudera Hindia barat Mentawai, prakiraan tinggi gelombang laut, dan pasang surut rob pesisir. Status: Siaga 24 Jam. |
+| 5 | **Stasiun Pemantau Atmosfer Global (GAW) Bukit Kototabang** | WMO Global Atmosphere Watch (Internasional) | `96161` (BKT) | Bukit Kototabang, Palembayan, Kab. Agam (Elevasi 864 m dpl, `-0.2019, 100.3180`) | Stasiun atmosfer global jejaring WMO PBB (satu-satunya di Indonesia & kawasan ekuator Asia) untuk pengamatan gas rumah kaca ($CO_2, CH_4, N_2O$), aerosol, dan kualitas udara. Status: Siaga Riset Internasional 24 Jam. |
+
+---
+
+### B. Diseminasi Prakiraan Cuaca Digital 19 Kabupaten/Kota (Layanan API Publik ADM4 BMKG)
+Untuk mendistribusikan prakiraan cuaca numerik dan deteksi bahaya hidrometeorologis ke seluruh wilayah, backend FastAPI melakukan sinkronisasi berkala terhadap **Layanan API Publik Resmi BMKG** (`https://api.bmkg.go.id/publik/prakiraan-cuaca?adm4=...`) untuk 19 wilayah administratif:
+
+| No | Wilayah Administratif | Kode Wilayah ADM4 | Karakteristik Bahaya Hidrometeorologis Lokal |
+|:---:|---|:---:|---|
+| 1 | **Kota Padang** | `13.71.01.1001` | Banjir Genangan Dataran Rendah, Pasang Air Laut Rob, dan Longsor Tebing Pesisir |
+| 2 | **Kota Bukittinggi** | `13.75.01.1001` | Angin Kencang Dataran Tinggi, Longsor Dinding Ngarai Sianok, dan Kabut Tebal |
+| 3 | **Kota Solok** | `13.72.01.1001` | Luapan Aliran Sungai Batang Lembang dan Banjir Genangan Kawasan Pertanian |
+| 4 | **Kota Padang Panjang** | `13.74.01.1001` | Curah Hujan Ekstrem, Aliran Lahar Dingin Marapi/Singgalang, dan Kabut Tebal Lembah Anai |
+| 5 | **Kota Payakumbuh** | `13.76.01.1002` | Luapan Daerah Aliran Sungai (DAS) Batang Agam dan Genangan Permukiman Warga |
+| 6 | **Kota Sawahlunto** | `13.73.01.1001` | Pergerakan Tanah Aktif dan Longsor Lereng Tebing Cekungan Tambang Ombilin |
+| 7 | **Kota Pariaman** | `13.77.01.1001` | Gelombang Pasang Samudera Hindia, Abrasi Bibir Pantai, dan Genangan Muara Sungai |
+| 8 | **Kab. Agam** | `13.06.01.2001` | Banjir Lahar Dingin Hujan Marapi (*Galodo*), Longsor Kaldera Maninjau, dan Banjir Bandang |
+| 9 | **Kab. Tanah Datar** | `13.04.01.2001` | Aliran Lahar Marapi/Singgalang, Longsor Lembah Anai, dan Luapan Batang Gadih |
+| 10 | **Kab. Padang Pariaman** | `13.05.01.2001` | Luapan Banjir DAS Batang Anai / Batang Ulakan dan Longsor Perbukitan Lubuk Alung |
+| 11 | **Kab. Pesisir Selatan** | `13.01.01.2001` | Banjir Bandang DAS Batang Tapan / Batang Tarusan, Longsor Ruas Jalan Pantai, dan Abrasi |
+| 12 | **Kab. Pasaman Barat** | `13.12.01.2001` | Luapan Sungai Batang Pasaman dan Bahaya Gerakan Tanah Lereng Gunung Talamau |
+| 13 | **Kab. Pasaman** | `13.08.04.2001` | Banjir Bandang Batang Sumpur dan Bahaya Longsor Ruas Nasional Lubuk Sikaping - Bonjol |
+| 14 | **Kab. Lima Puluh Kota** | `13.07.01.2001` | Longsor Tebing Batu Lembah Harau dan Luapan Sungai Batang Pangkalan Jalur Riau |
+| 15 | **Kab. Solok** | `13.02.06.2001` | Banjir Bandang Hulu Lembah Gumanti dan Gerakan Tanah Tebing Lereng Danau Kembar |
+| 16 | **Kab. Solok Selatan** | `13.11.01.2001` | Banjir Bandang Aliran Batang Suliti / Batang Bangko dan Longsor Trans-Sumatera Selatan |
+| 17 | **Kab. Sijunjung** | `13.03.04.2001` | Luapan Sungai Batang Kuantan / Batang Sukam dan Longsor Tebing Perbukitan Kapur |
+| 18 | **Kab. Dharmasraya** | `13.10.02.2001` | Luapan Aliran Sungai Batang Hari dan Genangan Banjir Wilayah Dataran Rendah |
+| 19 | **Kab. Kep. Mentawai** | `13.09.02.2001` | Gelombang Tinggi Samudera Hindia, Angin Badai Siklon Pesisir, dan Isolasi Logistik Laut |
 
 ---
 
 ## 6. Integritas Data, Model Indikatif & Batasan Sistem
 
-1. **Sensor Real-Time BMKG**:
-   - Data gempa bumi bersumber langsung dari sistem BMKG TEWS.
-   - Peringatan cuaca dan curah hujan presipitasi mm/jam diperbarui secara berkala dari server data terbuka BMKG.
+1. **Sensor Real-Time BMKG & Zero Hallucination**:
+   - Penempatan titik stasiun BMKG pada peta WebGIS mematuhi prinsip **Integritas Faktual Mutlak (*Zero Hallucination*)**: Sistem hanya memetakan **5 UPT Stasiun Pengamatan Fisik Resmi BMKG** yang benar-benar ada di Sumatera Barat (BIM Ketaping, Padang Panjang, Sicincin, Teluk Bayur, dan Bukit Kototabang) lengkap dengan atribut identitas resmi WMO/ICAO.
+   - Diseminasi prakiraan cuaca digital untuk 19 kabupaten/kota bersumber langsung dari **Layanan API Publik BMKG (ADM4)** untuk parameter numerik suhu, angin, dan curah hujan presipitasi mm/jam.
+   - Data sensor gempa bumi terhubung langsung ke sistem diseminasi gempa bumi real-time **BMKG TEWS** (*autogempa*).
 2. **Data Model Indikatif (Kerugian & Korban Historis)**:
    - Nilai agregat korban jiwa dan estimasi nominal kerugian fisik berstatus **"Model Indikatif & Estimasi Historis Agregasi BPBD/BNPB"** untuk keperluan simulasi kesiapsiagaan darurat.
 3. **Standar Keamanan OWASP**:
@@ -340,7 +357,7 @@ npx expo start
 - `POST /api/bencana/lapor` — Crowdsourcing pelaporan bencana warga dengan foto bukti visual.
 - `GET /api/bencana` — Feed data bencana terverifikasi operator Pusdalops.
 - `GET /api/eksternal/gempa-terkini` — Live feed sensor gempa BMKG TEWS.
-- `GET /api/eksternal/cuaca-peringatan` — Peringatan cuaca 19 simpul BMKG se-Sumatera Barat.
+- `GET /api/eksternal/cuaca-peringatan` — Peringatan dini cuaca ekstrem & analisis bahaya hidrometeorologis 19 wilayah kab/kota berbasis API BMKG.
 - `GET /api/laporan/sitrep` — Ekspor Laporan Situasi (SITREP) darurat format resmi BNPB (HTML/PDF siap cetak).
 - `POST /api/routing/evakuasi` — Kalkulasi rute evakuasi darurat sadar-blokade multi-moda.
 - `GET /api/events/stream` — Real-Time Server-Sent Events (SSE) EWS broadcast hub.
@@ -415,7 +432,7 @@ Kamu sedang menganalisis platform terpadu "GIS Kebencanaan Sumatera Barat", plat
 
 2. Aturan Domain Bencana:
 - Selalu prioritaskan FOSS (100% Free & Open-Source, tanpa ketergantungan API komersial berbayar).
-- Data gempa bumi & 19 simpul cuaca terhubung langsung ke API resmi BMKG.
+- Data gempa bumi BMKG TEWS & prakiraan cuaca 19 kabupaten/kota terhubung langsung ke API resmi BMKG dengan 5 stasiun pengamatan fisik faktual (Zero Hallucination).
 - Data korban dan kerugian berstatus Model Indikatif Agregasi Historis BPBD/BNPB.
 ```
 
