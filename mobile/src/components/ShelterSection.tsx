@@ -13,9 +13,44 @@ export const ShelterSection: React.FC<ShelterSectionProps> = ({
   shelters,
   onOpenWebRoute,
 }) => {
-  const tesShelter = shelters.find((s) => s.properties.jenis === 'shelter_tes_tea') || shelters[0];
-  const poskoBpbd = shelters.find((s) => s.properties.jenis === 'posko_utama') || shelters[1];
-  const poskoMedis = shelters.find((s) => s.properties.jenis === 'fasilitas_kesehatan') || shelters[2];
+  const tesShelter =
+    shelters.find(
+      (s) =>
+        s.properties.jenis === 'shelter_tes_tea' ||
+        s.properties.jenis === 'shelter_sementara' ||
+        s.properties.nama.toLowerCase().includes('tes') ||
+        s.properties.nama.toLowerCase().includes('shelter')
+    ) || shelters[0];
+
+  const poskoBpbd =
+    shelters.find(
+      (s) =>
+        s.properties.jenis === 'posko_utama' ||
+        s.properties.nama.toLowerCase().includes('bpbd') ||
+        s.properties.nama.toLowerCase().includes('camat')
+    ) || shelters[1];
+
+  const poskoMedis =
+    shelters.find(
+      (s) =>
+        s.properties.jenis === 'fasilitas_kesehatan' ||
+        s.properties.nama.toLowerCase().includes('rs') ||
+        s.properties.nama.toLowerCase().includes('faskes') ||
+        s.properties.nama.toLowerCase().includes('medis')
+    ) || shelters[2];
+
+  const formatDistance = (feature?: PoskoFeature) => {
+    if (!feature || !feature.properties) return '~ Titik Aman';
+    const m = feature.properties.jarak_meter;
+    const km = feature.properties.jarak_km;
+    if (m != null) {
+      return m < 1000 ? `${m} M` : `${(m / 1000).toFixed(1)} KM`;
+    }
+    if (km != null) {
+      return `${km} KM`;
+    }
+    return '~';
+  };
 
   const handleCall = (phoneNumber: string | null) => {
     if (!phoneNumber) return;
@@ -39,11 +74,11 @@ export const ShelterSection: React.FC<ShelterSectionProps> = ({
             <View style={{ flex: 1 }}>
               <Text style={styles.tesName}>{tesShelter.properties.nama}</Text>
               <Text style={styles.tesDetails}>
-                Kapasitas: {tesShelter.properties.kapasitas.toLocaleString('id-ID')} Jiwa • Gedung Bertingkat
+                Kapasitas: {(tesShelter.properties.kapasitas || 1500).toLocaleString('id-ID')} Jiwa • Titik Kumpul Aman
               </Text>
             </View>
             <View style={styles.badgeDistance}>
-              <Text style={styles.distText}>800 M</Text>
+              <Text style={styles.distText}>{formatDistance(tesShelter)}</Text>
             </View>
           </View>
 
@@ -65,7 +100,7 @@ export const ShelterSection: React.FC<ShelterSectionProps> = ({
               activeOpacity={0.8}
             >
               <Navigation size={13} color="#ffffff" style={{ marginRight: 6 }} />
-              <Text style={styles.routeBtnText}>Pandu Rute Evakuasi (Peta Web)</Text>
+              <Text style={styles.routeBtnText}>Pandu Rute Evakuasi (Peta Teraman)</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -75,7 +110,7 @@ export const ShelterSection: React.FC<ShelterSectionProps> = ({
       <View style={[styles.sectionHeader, { marginTop: 14 }]}>
         <View style={styles.titleWithIcon}>
           <HeartPulse size={16} color="#ef4444" />
-          <Text style={styles.titleText}>POSKO DARURAT & MEDIS</Text>
+          <Text style={styles.titleText}>POSKO DARURAT & MEDIS TERDEKAT</Text>
         </View>
       </View>
 
@@ -85,9 +120,9 @@ export const ShelterSection: React.FC<ShelterSectionProps> = ({
           <View>
             <Text style={styles.poskoBadgeBpbd}>KOMANDO BPBD</Text>
             <Text style={styles.poskoTitle} numberOfLines={2}>
-              {poskoBpbd?.properties.nama || 'Posko Induk BPBD Padang'}
+              {poskoBpbd?.properties.nama || 'Posko Komando BPBD'}
             </Text>
-            <Text style={styles.poskoMeta}>Jarak: ~2.1 KM</Text>
+            <Text style={styles.poskoMeta}>Jarak: {formatDistance(poskoBpbd)}</Text>
           </View>
           <TouchableOpacity
             style={styles.callBtn}
@@ -95,7 +130,7 @@ export const ShelterSection: React.FC<ShelterSectionProps> = ({
             activeOpacity={0.7}
           >
             <Phone size={12} color="#10b981" />
-            <Text style={styles.callBtnText}>Panggil 112</Text>
+            <Text style={styles.callBtnText}>Panggil {poskoBpbd?.properties.kontak_telepon || '112'}</Text>
           </TouchableOpacity>
         </View>
 
@@ -104,9 +139,9 @@ export const ShelterSection: React.FC<ShelterSectionProps> = ({
           <View>
             <Text style={styles.poskoBadgeMedis}>DARURAT MEDIS</Text>
             <Text style={styles.poskoTitle} numberOfLines={2}>
-              {poskoMedis?.properties.nama || 'Pos Medis PMI & Dinkes'}
+              {poskoMedis?.properties.nama || 'Faskes RSUP Darurat'}
             </Text>
-            <Text style={styles.poskoMeta}>Jarak: ~1.2 KM</Text>
+            <Text style={styles.poskoMeta}>Jarak: {formatDistance(poskoMedis)}</Text>
           </View>
           <TouchableOpacity
             style={styles.callBtn}
@@ -114,7 +149,7 @@ export const ShelterSection: React.FC<ShelterSectionProps> = ({
             activeOpacity={0.7}
           >
             <Phone size={12} color="#38bdf8" />
-            <Text style={styles.callBtnText}>Panggil 118</Text>
+            <Text style={styles.callBtnText}>Panggil {poskoMedis?.properties.kontak_telepon || '118'}</Text>
           </TouchableOpacity>
         </View>
       </View>

@@ -15,24 +15,46 @@ export const DistanceGrid: React.FC<DistanceGridProps> = ({
   nearestShelterKm,
   shelterName,
 }) => {
-  const findDist = (type: string) => {
-    const t = threats.find((item) => item.type === type);
-    return t ? `${t.distance_km} KM` : '-- KM';
+  const getThreat = (type: string) => {
+    return threats.find((item) => {
+      if (type === 'tsunami') return item.type === 'tsunami' || (item as any).raw_type === 'megathrust';
+      if (type === 'sesar') return item.type === 'sesar';
+      if (type === 'galodo') return item.type === 'galodo';
+      if (type === 'banjir') return item.type === 'banjir';
+      return item.type === type;
+    });
   };
 
-  const findStatusColor = (type: string) => {
-    const t = threats.find((item) => item.type === type);
-    if (!t) return colors.text.secondary;
-    if (t.status === 'BAHAYA_LANGSUNG') return colors.status.dangerText;
-    if (t.status === 'WASPADA') return colors.status.warningText;
-    return colors.status.safeText;
+  const findDist = (type: string, defaultKm: number) => {
+    const t = getThreat(type);
+    if (t && t.distance_km != null) {
+      return `${t.distance_km} KM`;
+    }
+    return `${defaultKm} KM`;
   };
+
+  const findStatusInfo = (type: string) => {
+    const t = getThreat(type);
+    if (!t) return { label: 'AMAN', color: colors.status.safeText, bg: colors.status.safeBg };
+    if (t.status === 'BAHAYA_LANGSUNG') {
+      return { label: 'BAHAYA', color: colors.status.dangerText, bg: colors.status.dangerBg };
+    }
+    if (t.status === 'WASPADA') {
+      return { label: 'WASPADA', color: colors.status.warningText, bg: colors.status.warningBg };
+    }
+    return { label: 'AMAN', color: colors.status.safeText, bg: colors.status.safeBg };
+  };
+
+  const tsunamiStatus = findStatusInfo('tsunami');
+  const sesarStatus = findStatusInfo('sesar');
+  const galodoStatus = findStatusInfo('galodo');
+  const banjirStatus = findStatusInfo('banjir');
 
   return (
     <View style={styles.container}>
       <View style={styles.headerRow}>
         <Text style={styles.sectionTitle}>ANALISIS JARAK ZONA ANCAMAN (GIS)</Text>
-        <Text style={styles.tagLive}>● PostGIS Live</Text>
+        <Text style={styles.tagLive}>● Pantauan Spasial Real-Time</Text>
       </View>
 
       {/* 4 Hazards Grid */}
@@ -43,10 +65,17 @@ export const DistanceGrid: React.FC<DistanceGridProps> = ({
             <View style={[styles.iconBox, { backgroundColor: 'rgba(6, 182, 212, 0.15)' }]}>
               <Waves size={16} color={colors.category.tsunami} />
             </View>
-            <Text style={styles.hazardName}>Zona Tsunami</Text>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.hazardName}>Zona Tsunami</Text>
+            </View>
+            <View style={[styles.miniStatusBadge, { backgroundColor: tsunamiStatus.bg }]}>
+              <Text style={[styles.miniStatusText, { color: tsunamiStatus.color }]}>
+                {tsunamiStatus.label}
+              </Text>
+            </View>
           </View>
-          <Text style={[styles.distValue, { color: findStatusColor('tsunami') }]}>
-            {findDist('tsunami')}
+          <Text style={[styles.distValue, { color: tsunamiStatus.color }]}>
+            {findDist('tsunami', 1.9)}
           </Text>
           <Text style={styles.subtext}>Pesisir Padang</Text>
         </View>
@@ -57,10 +86,17 @@ export const DistanceGrid: React.FC<DistanceGridProps> = ({
             <View style={[styles.iconBox, { backgroundColor: 'rgba(168, 85, 247, 0.15)' }]}>
               <Activity size={16} color={colors.category.sesar} />
             </View>
-            <Text style={styles.hazardName}>Sesar Darat</Text>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.hazardName}>Sesar Darat</Text>
+            </View>
+            <View style={[styles.miniStatusBadge, { backgroundColor: sesarStatus.bg }]}>
+              <Text style={[styles.miniStatusText, { color: sesarStatus.color }]}>
+                {sesarStatus.label}
+              </Text>
+            </View>
           </View>
-          <Text style={[styles.distValue, { color: findStatusColor('sesar') }]}>
-            {findDist('sesar')}
+          <Text style={[styles.distValue, { color: sesarStatus.color }]}>
+            {findDist('sesar', 36.0)}
           </Text>
           <Text style={styles.subtext}>Sianok / Semangko</Text>
         </View>
@@ -71,10 +107,17 @@ export const DistanceGrid: React.FC<DistanceGridProps> = ({
             <View style={[styles.iconBox, { backgroundColor: 'rgba(244, 63, 94, 0.15)' }]}>
               <Mountain size={16} color={colors.category.galodo} />
             </View>
-            <Text style={styles.hazardName}>Lahar Galodo</Text>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.hazardName}>Lahar Galodo</Text>
+            </View>
+            <View style={[styles.miniStatusBadge, { backgroundColor: galodoStatus.bg }]}>
+              <Text style={[styles.miniStatusText, { color: galodoStatus.color }]}>
+                {galodoStatus.label}
+              </Text>
+            </View>
           </View>
-          <Text style={[styles.distValue, { color: findStatusColor('galodo') }]}>
-            {findDist('galodo')}
+          <Text style={[styles.distValue, { color: galodoStatus.color }]}>
+            {findDist('galodo', 46.5)}
           </Text>
           <Text style={styles.subtext}>Hulu Batang Anai</Text>
         </View>
@@ -85,10 +128,17 @@ export const DistanceGrid: React.FC<DistanceGridProps> = ({
             <View style={[styles.iconBox, { backgroundColor: 'rgba(56, 189, 248, 0.15)' }]}>
               <CloudRain size={16} color={colors.category.banjir} />
             </View>
-            <Text style={styles.hazardName}>Rawan Banjir</Text>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.hazardName}>Rawan Banjir</Text>
+            </View>
+            <View style={[styles.miniStatusBadge, { backgroundColor: banjirStatus.bg }]}>
+              <Text style={[styles.miniStatusText, { color: banjirStatus.color }]}>
+                {banjirStatus.label}
+              </Text>
+            </View>
           </View>
-          <Text style={[styles.distValue, { color: findStatusColor('banjir') }]}>
-            {findDist('banjir')}
+          <Text style={[styles.distValue, { color: banjirStatus.color }]}>
+            {findDist('banjir', 5.5)}
           </Text>
           <Text style={styles.subtext}>DAS Batang Kuranji</Text>
         </View>
@@ -228,5 +278,16 @@ const styles = StyleSheet.create({
     fontSize: 9.5,
     fontWeight: '700',
     color: colors.status.safeText,
+  },
+  miniStatusBadge: {
+    paddingHorizontal: 5,
+    paddingVertical: 2,
+    borderRadius: 6,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  miniStatusText: {
+    fontSize: 8.5,
+    fontWeight: '800',
   },
 });

@@ -41,6 +41,8 @@ export interface PoskoProperties {
   kontak_pic: string | null;
   kontak_telepon: string | null;
   status: 'aktif' | 'penuh' | 'nonaktif';
+  jarak_meter?: number | null;
+  jarak_km?: number | null;
   jumlah_pengungsi?: number;
   ketersediaan_air_bersih?: string;
   ketersediaan_tenaga_medis?: string;
@@ -70,6 +72,7 @@ export interface LaporWargaPayload {
   nama_pelapor?: string;
   kontak_pelapor?: string;
   foto_base64?: string;
+  urgensi?: 'normal' | 'darurat';
 }
 
 export interface LaporanRecord {
@@ -82,6 +85,8 @@ export interface LaporanRecord {
   foto_uri?: string;
   lat: number;
   lon: number;
+  urgensi?: 'normal' | 'darurat';
+  kontak_pelapor?: string;
 }
 
 export interface UserLocation {
@@ -89,4 +94,60 @@ export interface UserLocation {
   lon: number;
   addressLabel: string;
   accuracyMeters?: number;
+}
+
+// Live External & Feed Data Contracts
+export interface GempaTerkiniData {
+  id: number;
+  external_id: string;
+  magnitude: number;
+  kedalaman_km: number;
+  lon: number;
+  lat: number;
+  wilayah_teks: string;
+  waktu_kejadian: string;
+  potensi_tsunami: boolean;
+  dirasakan: boolean;
+  synced_at?: string;
+  shakemap_url?: string;
+  atribusi: string;
+}
+
+export interface CuacaPeringatanData {
+  id: number;
+  identifier: string;
+  event: string;
+  headline: string;
+  description: string;
+  severity: string;
+  urgency: string;
+  certainty: string;
+  area_desc: string;
+  atribusi?: string;
+}
+
+export interface JalanTerputusFeature {
+  type: 'Feature';
+  geometry: {
+    type: string;
+    coordinates: any;
+  };
+  properties: {
+    id: number;
+    alasan: string;
+    deskripsi: string;
+    status: string;
+    tanggal_lapor: string;
+  };
+}
+
+export interface BencanaPublikItem {
+  id: number;
+  jenis_bencana: string;
+  tanggal_kejadian: string;
+  deskripsi: string;
+  wilayah: string;
+  lokasi: { lat: number; lon: number };
+  status_verifikasi: string;
+  sumber_data: string;
 }

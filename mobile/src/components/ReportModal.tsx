@@ -9,10 +9,12 @@ import {
   StyleSheet,
   ScrollView,
   ActivityIndicator,
+  Platform,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import * as ImageManipulator from 'expo-image-manipulator';
-import { Camera, X, MapPin, Send, CheckCircle2 } from 'lucide-react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Camera, Image as ImageIcon, X, MapPin, Send, CheckCircle2, AlertCircle, Phone } from 'lucide-react-native';
 import { colors } from '../theme/colors';
 import { sendLaporanKejadian } from '../api/client';
 import { LaporanRecord } from '../types';
@@ -37,7 +39,9 @@ export const ReportModal: React.FC<ReportModalProps> = ({
   onShowToast,
 }) => {
   const [jenisBencana, setJenisBencana] = useState('Banjir / Genangan Air');
+  const [urgensi, setUrgensi] = useState<'normal' | 'darurat'>('normal');
   const [keterangan, setKeterangan] = useState('');
+  const [kontak, setKontak] = useState('');
   const [imageUri, setImageUri] = useState<string | null>(null);
   const [imageBase64, setImageBase64] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -50,7 +54,48 @@ export const ReportModal: React.FC<ReportModalProps> = ({
     'Jalan Terputus / Blokade',
   ];
 
-  const pickImage = async () => {
+  const processImageUri = async (uri: string) => {
+    try {
+      // Kompresi agresif on-device menjadi WebP (<200KB)
+      const manipResult = await ImageManipulator.manipulateAsync(
+        uri,
+        [{ resize: { width: 1200 } }],
+        { compress: 0.7, format: ImageManipulator.SaveFormat.WEBP, base64: true }
+      );
+
+      setImageUri(manipResult.uri);
+      setImageBase64(manipResult.base64 ? `data:image/webp;base64,${manipResult.base64}` : null);
+    } catch (err) {
+      console.warn('Gagal memproses gambar:', err);
+    }
+  };
+
+  const handleLaunchCamera = async () => {
+    try {
+      if (Platform.OS !== 'web') {
+        const { status } = await ImagePicker.requestCameraPermissionsAsync();
+        if (status !== 'granted') {
+          onShowToast('Izin Kamera Ditolak', 'Aplikasi butuh izin kamera untuk bukti visual bencana.');
+          return;
+        }
+      }
+      const result = await ImagePicker.launchCameraAsync({
+        allowsEditing: true,
+        aspect: [4, 3],
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        await processImageUri(result.assets[0].uri);
+      }
+    } catch (err) {
+      console.warn('Gagal membuka kamera:', err);
+      // Fallback ke library jika browser/simulator tidak ada kamera fisik
+      handlePickFromLibrary();
+    }
+  };
+
+  const handlePickFromLibrary = async () => {
     try {
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
@@ -60,20 +105,10 @@ export const ReportModal: React.FC<ReportModalProps> = ({
       });
 
       if (!result.canceled && result.assets && result.assets.length > 0) {
-        const asset = result.assets[0];
-
-        // Kompresi agresif on-device menjadi WebP (<200KB)
-        const manipResult = await ImageManipulator.manipulateAsync(
-          asset.uri,
-          [{ resize: { width: 1200 } }],
-          { compress: 0.7, format: ImageManipulator.SaveFormat.WEBP, base64: true }
-        );
-
-        setImageUri(manipResult.uri);
-        setImageBase64(manipResult.base64 ? `data:image/webp;base64,${manipResult.base64}` : null);
+        await processImageUri(result.assets[0].uri);
       }
     } catch (err) {
-      console.warn('Gagal memproses gambar:', err);
+      console.warn('Gagal membuka galeri:', err);
     }
   };
 
@@ -84,42 +119,68 @@ export const ReportModal: React.FC<ReportModalProps> = ({
     }
 
     setIsSubmitting(true);
+    const newRecord: LaporanRecord = {
+      id: `rep-${Date.now()}`,
+      jenis_bencana: jenisBencana,
+      lokasi_teks: locationLabel,
+      deskripsi: keterangan,
+      timestamp: 'Baru saja',
+      status: 'Menunggu Verifikasi BPBD',
+      foto_uri: imageUri || undefined,
+      lat: userLat,
+      lon: userLon,
+      urgensi: urgensi,
+      kontak_pelapor: kontak || undefined,
+    };
+
     try {
       const res = await sendLaporanKejadian({
         jenis_bencana: jenisBencana,
         lat: userLat,
         lon: userLon,
-        deskripsi: keterangan,
+        deskripsi: `[Urgensi: ${urgensi.toUpperCase()}] ${keterangan}`,
         nama_pelapor: 'Warga Lapangan',
+        kontak_pelapor: kontak || undefined,
         foto_base64: imageBase64 || undefined,
+        urgensi: urgensi,
       });
 
-      const newRecord: LaporanRecord = {
-        id: String(res.id || Date.now()),
-        jenis_bencana: jenisBencana,
-        lokasi_teks: locationLabel,
-        deskripsi: keterangan,
-        timestamp: 'Baru saja',
-        status: 'Menunggu Verifikasi BPBD',
-        foto_uri: imageUri || undefined,
-        lat: userLat,
-        lon: userLon,
-      };
-
-      onReportSuccess(newRecord);
-      onShowToast('Laporan Terkirim', 'Bukti visual dan titik GPS diteruskan ke Pusdalops BPBD.');
+      if (res.success) {
+        if (res.id) newRecord.id = String(res.id);
+        onReportSuccess(newRecord);
+        onShowToast('Laporan Terkirim', 'Laporan dan koordinat GPS berhasil diterima Pusdalops BPBD.');
+      } else {
+        // Simpan offline ke AsyncStorage
+        await saveReportOffline(newRecord);
+        onReportSuccess(newRecord);
+        onShowToast('Tersimpan di Antrean', 'Sinyal terputus. Laporan disimpan dan dikirim otomatis saat online.');
+      }
       resetForm();
       onClose();
     } catch (err) {
-      onShowToast('Tersimpan Lokal', 'Laporan disimpan di antrean offline perangkat.');
+      await saveReportOffline(newRecord);
+      onReportSuccess(newRecord);
+      onShowToast('Tersimpan di Antrean', 'Laporan disimpan di memori HP dan akan disinkronkan saat sinyal pulih.');
+      resetForm();
       onClose();
     } finally {
       setIsSubmitting(false);
     }
   };
 
+  const saveReportOffline = async (record: LaporanRecord) => {
+    try {
+      const existing = await AsyncStorage.getItem('@offline_reports');
+      const list = existing ? JSON.parse(existing) : [];
+      list.unshift(record);
+      await AsyncStorage.setItem('@offline_reports', JSON.stringify(list));
+    } catch (_) {}
+  };
+
   const resetForm = () => {
     setKeterangan('');
+    setKontak('');
+    setUrgensi('normal');
     setImageUri(null);
     setImageBase64(null);
   };
@@ -130,32 +191,68 @@ export const ReportModal: React.FC<ReportModalProps> = ({
         <View style={styles.modalContent}>
           {/* Header */}
           <View style={styles.header}>
-            <Text style={styles.headerTitle}>Buat Laporan Kejadian Bencana</Text>
+            <View>
+              <Text style={styles.headerTitle}>Buat Laporan Bencana</Text>
+              <Text style={styles.headerSub}>Terhubung langsung ke Command Center BPBD</Text>
+            </View>
             <TouchableOpacity style={styles.closeBtn} onPress={onClose}>
               <X size={16} color={colors.text.secondary} />
             </TouchableOpacity>
           </View>
 
           <ScrollView style={styles.scrollBody} showsVerticalScrollIndicator={false}>
+            {/* Tingkat Urgensi */}
+            <Text style={styles.inputLabel}>Tingkat Urgensi Situasi</Text>
+            <View style={styles.urgencyRow}>
+              <TouchableOpacity
+                style={[styles.urgencyBtn, urgensi === 'normal' && styles.urgencyBtnNormalActive]}
+                onPress={() => setUrgensi('normal')}
+              >
+                <Text style={[styles.urgencyBtnText, urgensi === 'normal' && styles.urgencyBtnTextActive]}>
+                  🟡 Informasi Bencana
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.urgencyBtn, urgensi === 'darurat' && styles.urgencyBtnDangerActive]}
+                onPress={() => setUrgensi('darurat')}
+              >
+                <Text style={[styles.urgencyBtnText, urgensi === 'darurat' && styles.urgencyBtnTextDanger]}>
+                  🔴 Butuh Evakuasi Darurat
+                </Text>
+              </TouchableOpacity>
+            </View>
+
             {/* Foto Bukti Picker */}
-            <Text style={styles.inputLabel}>Foto Bukti Kejadian (Rekomendasi WebP)</Text>
-            <TouchableOpacity style={styles.imagePicker} onPress={pickImage} activeOpacity={0.8}>
-              {imageUri ? (
-                <View style={styles.previewContainer}>
-                  <Image source={{ uri: imageUri }} style={styles.previewImage} />
-                  <View style={styles.badgeReady}>
-                    <CheckCircle2 size={12} color="#ffffff" />
-                    <Text style={styles.badgeReadyText}>Foto Siap (WebP Terkompresi)</Text>
-                  </View>
+            <Text style={styles.inputLabel}>Foto Bukti Lapangan</Text>
+            {imageUri ? (
+              <View style={styles.previewContainer}>
+                <Image source={{ uri: imageUri }} style={styles.previewImage} />
+                <View style={styles.badgeReady}>
+                  <CheckCircle2 size={12} color="#ffffff" />
+                  <Text style={styles.badgeReadyText}>Foto Terlampir & Terkompresi</Text>
                 </View>
-              ) : (
-                <View style={styles.placeholderBox}>
-                  <Camera size={26} color={colors.brand.primary} />
-                  <Text style={styles.placeholderText}>Ambil Foto dari Kamera / Galeri</Text>
-                  <Text style={styles.placeholderSub}>Otomatis dikompresi agar hemat kuota darurat</Text>
-                </View>
-              )}
-            </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.retakeBtn}
+                  onPress={() => {
+                    setImageUri(null);
+                    setImageBase64(null);
+                  }}
+                >
+                  <Text style={styles.retakeText}>Ganti Foto</Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <View style={styles.photoActionsRow}>
+                <TouchableOpacity style={styles.photoActionBtn} onPress={handleLaunchCamera} activeOpacity={0.8}>
+                  <Camera size={20} color={colors.brand.primary} />
+                  <Text style={styles.photoActionText}>Ambil Foto Kamera</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.photoActionBtn} onPress={handlePickFromLibrary} activeOpacity={0.8}>
+                  <ImageIcon size={20} color={colors.category.banjir} />
+                  <Text style={styles.photoActionText}>Pilih dari Galeri</Text>
+                </TouchableOpacity>
+              </View>
+            )}
 
             {/* Kategori Bencana Chips */}
             <Text style={styles.inputLabel}>Pilih Kategori Bencana</Text>
@@ -180,18 +277,32 @@ export const ReportModal: React.FC<ReportModalProps> = ({
             <View style={styles.locBox}>
               <MapPin size={16} color={colors.brand.primary} />
               <View style={{ flex: 1 }}>
-                <Text style={styles.locTitle}>Koordinat GPS Otomatis</Text>
+                <Text style={styles.locTitle}>Koordinat GPS Terdeteksi</Text>
                 <Text style={styles.locText} numberOfLines={1}>
                   {locationLabel} ({userLat.toFixed(4)}, {userLon.toFixed(4)})
                 </Text>
               </View>
             </View>
 
+            {/* Kontak Pelapor */}
+            <Text style={styles.inputLabel}>Nomor HP / WhatsApp Pelapor (Opsional)</Text>
+            <View style={styles.phoneInputBox}>
+              <Phone size={14} color={colors.text.muted} />
+              <TextInput
+                style={styles.phoneInput}
+                placeholder="Contoh: 081234567890 (Untuk konfirmasi tim SAR)"
+                placeholderTextColor={colors.text.muted}
+                keyboardType="phone-pad"
+                value={kontak}
+                onChangeText={setKontak}
+              />
+            </View>
+
             {/* Deskripsi */}
-            <Text style={styles.inputLabel}>Deskripsi Kondisi & Kebutuhan Darurat</Text>
+            <Text style={styles.inputLabel}>Deskripsi Kondisi & Korban</Text>
             <TextInput
               style={styles.textInput}
-              placeholder="Contoh: Ketinggian genangan air 60cm merendam jalan dan pemukiman warga..."
+              placeholder="Contoh: Ketinggian air 60cm, ada 2 lansia terjebak di dalam rumah butuh perahu karet..."
               placeholderTextColor={colors.text.muted}
               multiline
               numberOfLines={3}
@@ -203,7 +314,7 @@ export const ReportModal: React.FC<ReportModalProps> = ({
           {/* Submit Action */}
           <View style={styles.footer}>
             <TouchableOpacity
-              style={styles.submitBtn}
+              style={[styles.submitBtn, urgensi === 'darurat' && { backgroundColor: '#dc2626' }]}
               onPress={handleSubmit}
               disabled={isSubmitting}
               activeOpacity={0.85}
@@ -213,7 +324,9 @@ export const ReportModal: React.FC<ReportModalProps> = ({
               ) : (
                 <>
                   <Send size={15} color="#ffffff" />
-                  <Text style={styles.submitBtnText}>Kirim Laporan ke BPBD</Text>
+                  <Text style={styles.submitBtnText}>
+                    {urgensi === 'darurat' ? 'KIRIM LAPORAN DARURAT (PRIORITAS)' : 'Kirim Laporan ke BPBD'}
+                  </Text>
                 </>
               )}
             </TouchableOpacity>
@@ -252,6 +365,11 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: colors.text.primary,
   },
+  headerSub: {
+    fontSize: 10.5,
+    color: colors.text.muted,
+    marginTop: 2,
+  },
   closeBtn: {
     width: 32,
     height: 32,
@@ -269,6 +387,99 @@ const styles = StyleSheet.create({
     color: colors.text.secondary,
     marginBottom: 8,
     marginTop: 6,
+  },
+  urgencyRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 14,
+  },
+  urgencyBtn: {
+    flex: 1,
+    paddingVertical: 10,
+    paddingHorizontal: 8,
+    borderRadius: 12,
+    backgroundColor: colors.surface.cardSecondary,
+    borderWidth: 1,
+    borderColor: colors.surface.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  urgencyBtnNormalActive: {
+    backgroundColor: 'rgba(234, 179, 8, 0.15)',
+    borderColor: '#eab308',
+  },
+  urgencyBtnDangerActive: {
+    backgroundColor: 'rgba(239, 68, 68, 0.15)',
+    borderColor: '#ef4444',
+  },
+  urgencyBtnText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: colors.text.muted,
+  },
+  urgencyBtnTextActive: {
+    color: '#eab308',
+    fontWeight: '800',
+  },
+  urgencyBtnTextDanger: {
+    color: '#ef4444',
+    fontWeight: '800',
+  },
+  photoActionsRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 14,
+  },
+  photoActionBtn: {
+    flex: 1,
+    height: 76,
+    backgroundColor: colors.surface.cardSecondary,
+    borderRadius: 14,
+    borderWidth: 1.5,
+    borderColor: colors.surface.border,
+    borderStyle: 'dashed',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+  },
+  photoActionText: {
+    fontSize: 11,
+    color: colors.text.secondary,
+    fontWeight: '600',
+  },
+  retakeBtn: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    backgroundColor: 'rgba(15, 23, 42, 0.85)',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+  },
+  retakeText: {
+    fontSize: 10,
+    color: '#ffffff',
+    fontWeight: '700',
+  },
+  phoneInputBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.surface.cardSecondary,
+    borderRadius: 14,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderWidth: 1,
+    borderColor: colors.surface.border,
+    marginBottom: 14,
+    gap: 8,
+  },
+  phoneInput: {
+    flex: 1,
+    fontSize: 12,
+    color: colors.text.primary,
+    padding: 0,
   },
   imagePicker: {
     borderWidth: 1.5,

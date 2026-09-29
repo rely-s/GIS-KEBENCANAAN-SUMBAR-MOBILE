@@ -7,9 +7,10 @@ import { ThreatStatus } from '../types';
 interface HeroStatusProps {
   status: ThreatStatus;
   directive: string;
+  lastUpdated?: string;
 }
 
-export const HeroStatus: React.FC<HeroStatusProps> = ({ status, directive }) => {
+export const HeroStatus: React.FC<HeroStatusProps> = ({ status, directive, lastUpdated }) => {
   const isDanger = status === 'BAHAYA_LANGSUNG';
   const isWarning = status === 'WASPADA';
 
@@ -33,7 +34,7 @@ export const HeroStatus: React.FC<HeroStatusProps> = ({ status, directive }) => 
         bg: colors.status.safeBg,
         border: colors.status.safeBorder,
         text: colors.status.safeText,
-        badgeText: 'STATUS AMAN',
+        badgeText: 'KONDISI TERPANTAU KONDUSIF',
         Icon: ShieldCheck,
       };
 
@@ -42,12 +43,17 @@ export const HeroStatus: React.FC<HeroStatusProps> = ({ status, directive }) => 
   return (
     <View style={[styles.container, { backgroundColor: config.bg, borderColor: config.border }]}>
       <View style={styles.iconCircle}>
-        <Icon size={28} color="#ffffff" />
+        <Icon size={26} color="#ffffff" />
       </View>
       <Text style={styles.badgeLabel}>{config.badgeText}</Text>
       <Text style={[styles.directiveText, { color: config.text }]}>
-        {directive || 'Anda berada di luar radius sempadan bahaya aktif Sumatera Barat saat ini.'}
+        {directive || 'Lokasi berada di luar radius sempadan langsung ancaman bahaya saat ini.'}
       </Text>
+      {lastUpdated && (
+        <View style={styles.timestampBox}>
+          <Text style={styles.timestampText}>Pembaruan Sistem: {lastUpdated}</Text>
+        </View>
+      )}
     </View>
   );
 };
@@ -88,5 +94,17 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 18,
     paddingHorizontal: 8,
+  },
+  timestampBox: {
+    marginTop: 8,
+    backgroundColor: 'rgba(0, 0, 0, 0.2)',
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+    borderRadius: 8,
+  },
+  timestampText: {
+    fontSize: 9.5,
+    fontWeight: '600',
+    color: 'rgba(255, 255, 255, 0.75)',
   },
 });
