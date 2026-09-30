@@ -75,7 +75,7 @@ export const DistanceGrid: React.FC<DistanceGridProps> = ({
     <View style={styles.container}>
       <View style={styles.headerRow}>
         <Text style={styles.sectionTitle}>ANALISIS JARAK ZONA ANCAMAN (GIS)</Text>
-        <Text style={styles.tagLive}>● Pantauan Spasial Real-Time</Text>
+        <Text style={styles.tagLive}></Text>
       </View>
 
       {/* 4 Hazards Grid */}
