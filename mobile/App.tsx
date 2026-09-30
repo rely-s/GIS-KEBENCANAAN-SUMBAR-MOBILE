@@ -334,32 +334,8 @@ export default function App() {
                 }}
               />
 
-              {/* Shelter & Posko Medis */}
-              <ShelterSection
-                shelters={shelterData?.features || []}
-                userLat={userLat}
-                userLon={userLon}
-                onOpenWebRoute={handleOpenWebEvacuationRoute}
-              />
-
               {/* Web GIS Seamless Handoff */}
               <WebMapHandoff userLat={userLat} userLon={userLon} />
-
-              {/* Bottom Quick Call */}
-              <View style={styles.fastCallBanner}>
-                <View>
-                  <Text style={styles.callBannerTitle}>Siaga Tanggap Bencana</Text>
-                  <Text style={styles.callBannerSub}>Operator Pusdalops BPBD Prov. Sumbar 24/7</Text>
-                </View>
-                <TouchableOpacity
-                  style={styles.call112Btn}
-                  onPress={() => setIsSosOpen(true)}
-                  activeOpacity={0.8}
-                >
-                  <PhoneCall size={14} color="#dc2626" />
-                  <Text style={styles.call112Text}>Hubungi 112</Text>
-                </TouchableOpacity>
-              </View>
             </View>
           )}
 
