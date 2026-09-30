@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { ShieldCheck, AlertTriangle, Flame } from 'lucide-react-native';
+import { ShieldCheck, AlertTriangle, Flame, CheckCircle } from 'lucide-react-native';
 import { colors } from '../theme/colors';
 import { ThreatStatus } from '../types';
 
@@ -16,25 +16,28 @@ export const HeroStatus: React.FC<HeroStatusProps> = ({ status, directive, lastU
 
   const config = isDanger
     ? {
-        bg: colors.status.dangerBg,
-        border: colors.status.dangerBorder,
-        text: colors.status.dangerText,
-        badgeText: 'ZONA BAHAYA LANGSUNG',
+        bg: '#7f1d1d', // Red 900
+        border: '#991b1b', // Red 800
+        iconBg: '#ef4444', // Red 500
+        text: '#fecaca', // Red 200
+        badgeText: 'STATUS BAHAYA',
         Icon: Flame,
       }
     : isWarning
     ? {
-        bg: colors.status.warningBg,
-        border: colors.status.warningBorder,
-        text: colors.status.warningText,
-        badgeText: 'ZONA WASPADA BENCANA',
+        bg: '#78350f', // Amber 900
+        border: '#92400e', // Amber 800
+        iconBg: '#f59e0b', // Amber 500
+        text: '#fde68a', // Amber 200
+        badgeText: 'STATUS WASPADA',
         Icon: AlertTriangle,
       }
     : {
-        bg: colors.status.safeBg,
-        border: colors.status.safeBorder,
-        text: colors.status.safeText,
-        badgeText: 'KONDISI TERPANTAU KONDUSIF',
+        bg: '#064e3b', // Emerald 900
+        border: '#065f46', // Emerald 800
+        iconBg: '#10b981', // Emerald 500
+        text: '#d1fae5', // Emerald 100
+        badgeText: 'STATUS AMAN',
         Icon: ShieldCheck,
       };
 
@@ -42,18 +45,19 @@ export const HeroStatus: React.FC<HeroStatusProps> = ({ status, directive, lastU
 
   return (
     <View style={[styles.container, { backgroundColor: config.bg, borderColor: config.border }]}>
-      <View style={styles.iconCircle}>
-        <Icon size={26} color="#ffffff" />
+      <View style={styles.bgIconWrapper}>
+        <CheckCircle size={100} color={config.iconBg} opacity={0.15} />
       </View>
-      <Text style={styles.badgeLabel}>{config.badgeText}</Text>
-      <Text style={[styles.directiveText, { color: config.text }]}>
-        {directive || 'Lokasi berada di luar radius sempadan langsung ancaman bahaya saat ini.'}
-      </Text>
-      {lastUpdated && (
-        <View style={styles.timestampBox}>
-          <Text style={styles.timestampText}>Pembaruan Sistem: {lastUpdated}</Text>
+      
+      <View style={styles.contentWrapper}>
+        <View style={[styles.iconCircle, { backgroundColor: config.iconBg, shadowColor: config.iconBg }]}>
+          <Icon size={24} color="#ffffff" />
         </View>
-      )}
+        <Text style={styles.badgeLabel}>{config.badgeText}</Text>
+        <Text style={[styles.directiveText, { color: config.text }]}>
+          {directive || 'Anda berada di luar zona bahaya terdekat.'}
+        </Text>
+      </View>
     </View>
   );
 };
@@ -61,50 +65,52 @@ export const HeroStatus: React.FC<HeroStatusProps> = ({ status, directive, lastU
 const styles = StyleSheet.create({
   container: {
     borderRadius: 24,
-    padding: 18,
-    alignItems: 'center',
-    textAlign: 'center',
-    borderWidth: 1.5,
-    marginVertical: 6,
+    padding: 20,
+    borderWidth: 1,
+    marginVertical: 10,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 4,
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  bgIconWrapper: {
+    position: 'absolute',
+    right: -20,
+    bottom: -20,
+    zIndex: 0,
+  },
+  contentWrapper: {
+    alignItems: 'center',
+    textAlign: 'center',
+    zIndex: 10,
   },
   iconCircle: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    width: 56,
+    height: 56,
+    borderRadius: 28,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 10,
+    marginBottom: 12,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.6,
+    shadowRadius: 15,
+    elevation: 8,
   },
   badgeLabel: {
-    fontSize: 16,
+    fontSize: 20,
     fontWeight: '900',
     color: '#ffffff',
-    letterSpacing: 0.8,
+    letterSpacing: 0.5,
     marginBottom: 4,
   },
   directiveText: {
     fontSize: 12,
-    fontWeight: '600',
+    fontWeight: '400',
     textAlign: 'center',
     lineHeight: 18,
-    paddingHorizontal: 8,
-  },
-  timestampBox: {
-    marginTop: 8,
-    backgroundColor: 'rgba(0, 0, 0, 0.2)',
-    paddingHorizontal: 10,
-    paddingVertical: 3,
-    borderRadius: 8,
-  },
-  timestampText: {
-    fontSize: 9.5,
-    fontWeight: '600',
-    color: 'rgba(255, 255, 255, 0.75)',
+    opacity: 0.8,
   },
 });
