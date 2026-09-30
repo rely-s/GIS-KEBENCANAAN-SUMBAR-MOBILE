@@ -593,7 +593,9 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   footer: {
-    padding: 16,
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: Platform.OS === 'android' ? 24 : 16,
     borderTopWidth: 1,
     borderColor: colors.surface.borderSubtle,
     backgroundColor: colors.surface.card,

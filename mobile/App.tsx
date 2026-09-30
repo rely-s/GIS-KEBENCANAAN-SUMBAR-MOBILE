@@ -28,7 +28,6 @@ import { colors } from './src/theme/colors';
 import { Header } from './src/components/Header';
 import { HeroStatus } from './src/components/HeroStatus';
 import { DistanceGrid, type FacilityRouteTarget } from './src/components/DistanceGrid';
-import { ShelterSection, type ShelterRouteParams } from './src/components/ShelterSection';
 import { WebMapHandoff } from './src/components/WebMapHandoff';
 import { ReportModal } from './src/components/ReportModal';
 import { SosModal } from './src/components/SosModal';
@@ -157,7 +156,7 @@ export default function App() {
   };
 
   // Handoff Pandu Rute Evakuasi ke Web GIS
-  const handleOpenWebEvacuationRoute = async (target?: ShelterRouteParams | (FacilityRouteTarget & { bencana?: string })) => {
+  const handleOpenWebEvacuationRoute = async (target?: FacilityRouteTarget & { bencana?: string; poskoId?: number; jenis?: string }) => {
     try {
       const webBaseUrl = 'http://127.0.0.1:5173';
       const bencanaType = target?.bencana || 'tsunami';
@@ -243,7 +242,11 @@ export default function App() {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="light-content" backgroundColor={colors.surface.canvas} />
+      <StatusBar
+        barStyle="light-content"
+        backgroundColor={colors.surface.canvas}
+        translucent={Platform.OS === 'android'}
+      />
 
       {/* Floating Toast Notification */}
       <Toast
@@ -554,6 +557,7 @@ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
     backgroundColor: colors.surface.canvas,
+    paddingTop: Platform.OS === 'android' ? Math.max(StatusBar.currentHeight || 0, 24) : 0,
   },
   centerLoading: {
     flex: 1,
@@ -570,8 +574,8 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    paddingHorizontal: 16,
-    paddingBottom: 120,
+    paddingHorizontal: 14,
+    paddingBottom: Platform.OS === 'android' ? 140 : 110,
   },
   tabContent: {
     paddingTop: 4,
@@ -823,14 +827,15 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    height: 68,
-    backgroundColor: 'rgba(15, 23, 42, 0.96)',
+    height: Platform.OS === 'android' ? 72 : 68,
+    backgroundColor: 'rgba(15, 23, 42, 0.98)',
     borderTopWidth: 1,
     borderColor: colors.surface.borderSubtle,
     flexDirection: 'row',
     justifyContent: 'space-around',
     alignItems: 'center',
     paddingHorizontal: 12,
+    paddingBottom: Platform.OS === 'android' ? 8 : 4,
   },
   navBtn: {
     alignItems: 'center',
