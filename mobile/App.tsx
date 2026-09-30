@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import {
-  SafeAreaView,
   StatusBar,
   ScrollView,
   View,
@@ -10,6 +9,7 @@ import {
   ActivityIndicator,
   Platform,
 } from 'react-native';
+import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Location from 'expo-location';
 import {
   Home,
@@ -37,6 +37,15 @@ import { fetchProximityCheck, fetchShelters, calculateLocalHaversineKm } from '.
 import { ProximityCheckResponse, PoskoResponse, LaporanRecord } from './src/types';
 
 export default function App() {
+  return (
+    <SafeAreaProvider>
+      <MainApp />
+    </SafeAreaProvider>
+  );
+}
+
+function MainApp() {
+  const insets = useSafeAreaInsets();
   // Navigation State
   const [activeTab, setActiveTab] = useState<'beranda' | 'feed' | 'riwayat'>('beranda');
 
@@ -241,7 +250,7 @@ export default function App() {
   }, [nearestPoskoFeature, userLat, userLon]);
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <View style={[styles.safeArea, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
       <StatusBar
         barStyle="light-content"
         backgroundColor={colors.surface.canvas}
@@ -549,7 +558,7 @@ export default function App() {
         userLon={userLon}
         onShowToast={showToast}
       />
-    </SafeAreaView>
+    </View>
   );
 }
 
@@ -557,7 +566,6 @@ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
     backgroundColor: colors.surface.canvas,
-    paddingTop: Platform.OS === 'android' ? Math.max(StatusBar.currentHeight || 0, 24) : 0,
   },
   centerLoading: {
     flex: 1,
@@ -575,7 +583,7 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     paddingHorizontal: 14,
-    paddingBottom: Platform.OS === 'android' ? 140 : 110,
+    paddingBottom: 24,
   },
   tabContent: {
     paddingTop: 4,
@@ -823,11 +831,7 @@ const styles = StyleSheet.create({
   },
   // Bottom Navigation
   bottomNav: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    height: Platform.OS === 'android' ? 72 : 68,
+    height: 62,
     backgroundColor: 'rgba(15, 23, 42, 0.98)',
     borderTopWidth: 1,
     borderColor: colors.surface.borderSubtle,
@@ -835,7 +839,6 @@ const styles = StyleSheet.create({
     justifyContent: 'space-around',
     alignItems: 'center',
     paddingHorizontal: 12,
-    paddingBottom: Platform.OS === 'android' ? 8 : 4,
   },
   navBtn: {
     alignItems: 'center',
