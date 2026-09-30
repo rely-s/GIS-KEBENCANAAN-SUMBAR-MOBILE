@@ -3,14 +3,28 @@ import { View, Text, TouchableOpacity, StyleSheet, Linking } from 'react-native'
 import { Building2, Navigation, Phone, HeartPulse, CheckCircle2 } from 'lucide-react-native';
 import { colors } from '../theme/colors';
 import { PoskoFeature } from '../types';
+import { calculateLocalHaversineKm } from '../api/client';
+
+export interface ShelterRouteParams {
+  poskoId?: number;
+  lat?: number;
+  lon?: number;
+  nama?: string;
+  jenis?: string;
+  bencana?: string;
+}
 
 interface ShelterSectionProps {
   shelters: PoskoFeature[];
-  onOpenWebRoute: (poskoId?: number) => void;
+  userLat?: number;
+  userLon?: number;
+  onOpenWebRoute: (params: ShelterRouteParams) => void;
 }
 
 export const ShelterSection: React.FC<ShelterSectionProps> = ({
   shelters,
+  userLat,
+  userLon,
   onOpenWebRoute,
 }) => {
   const tesShelter =
@@ -40,14 +54,18 @@ export const ShelterSection: React.FC<ShelterSectionProps> = ({
     ) || shelters[2];
 
   const formatDistance = (feature?: PoskoFeature) => {
-    if (!feature || !feature.properties) return '~ Titik Aman';
-    const m = feature.properties.jarak_meter;
-    const km = feature.properties.jarak_km;
-    if (m != null) {
-      return m < 1000 ? `${m} M` : `${(m / 1000).toFixed(1)} KM`;
+    if (!feature || !feature.geometry) return '~ Titik Aman';
+    let km = feature.properties?.jarak_km;
+    if (userLat != null && userLon != null && feature.geometry.coordinates) {
+      const fLon = feature.geometry.coordinates[0];
+      const fLat = feature.geometry.coordinates[1];
+      km = calculateLocalHaversineKm(userLat, userLon, fLat, fLon);
     }
     if (km != null) {
-      return `${km} KM`;
+      if (km < 1.0) {
+        return `${Math.round(km * 1000)} M (Lurus)`;
+      }
+      return `${km.toFixed(2)} KM (Lurus)`;
     }
     return '~';
   };
@@ -96,7 +114,15 @@ export const ShelterSection: React.FC<ShelterSectionProps> = ({
           <View style={styles.actionRow}>
             <TouchableOpacity
               style={styles.routeBtn}
-              onPress={() => onOpenWebRoute(tesShelter.properties.id)}
+              onPress={() =>
+                onOpenWebRoute({
+                  poskoId: tesShelter.properties.id,
+                  lat: tesShelter.geometry?.coordinates?.[1],
+                  lon: tesShelter.geometry?.coordinates?.[0],
+                  nama: tesShelter.properties.nama,
+                  jenis: tesShelter.properties.jenis,
+                })
+              }
               activeOpacity={0.8}
             >
               <Navigation size={13} color="#ffffff" style={{ marginRight: 6 }} />
@@ -118,39 +144,87 @@ export const ShelterSection: React.FC<ShelterSectionProps> = ({
         {/* Posko BPBD */}
         <View style={styles.poskoCard}>
           <View>
-            <Text style={styles.poskoBadgeBpbd}>KOMANDO BPBD</Text>
+            <View style={styles.poskoTopRow}>
+              <Text style={styles.poskoBadgeBpbd}>KOMANDO BPBD</Text>
+              <View style={styles.badgeDistanceMini}>
+                <Text style={styles.distTextMini}>{formatDistance(poskoBpbd)}</Text>
+              </View>
+            </View>
             <Text style={styles.poskoTitle} numberOfLines={2}>
               {poskoBpbd?.properties.nama || 'Posko Komando BPBD'}
             </Text>
-            <Text style={styles.poskoMeta}>Jarak: {formatDistance(poskoBpbd)}</Text>
           </View>
-          <TouchableOpacity
-            style={styles.callBtn}
-            onPress={() => handleCall(poskoBpbd?.properties.kontak_telepon || '112')}
-            activeOpacity={0.7}
-          >
-            <Phone size={12} color="#10b981" />
-            <Text style={styles.callBtnText}>Panggil {poskoBpbd?.properties.kontak_telepon || '112'}</Text>
-          </TouchableOpacity>
+          <View style={styles.poskoActionCol}>
+            {poskoBpbd && (
+              <TouchableOpacity
+                style={styles.routeBtnMini}
+                onPress={() =>
+                  onOpenWebRoute({
+                    poskoId: poskoBpbd.properties.id,
+                    lat: poskoBpbd.geometry?.coordinates?.[1],
+                    lon: poskoBpbd.geometry?.coordinates?.[0],
+                    nama: poskoBpbd.properties.nama,
+                    jenis: poskoBpbd.properties.jenis,
+                  })
+                }
+                activeOpacity={0.8}
+              >
+                <Navigation size={11} color="#ffffff" />
+                <Text style={styles.routeBtnMiniText}>Rute Evakuasi</Text>
+              </TouchableOpacity>
+            )}
+            <TouchableOpacity
+              style={styles.callBtn}
+              onPress={() => handleCall(poskoBpbd?.properties.kontak_telepon || '112')}
+              activeOpacity={0.7}
+            >
+              <Phone size={11} color="#10b981" />
+              <Text style={styles.callBtnText}>Panggil {poskoBpbd?.properties.kontak_telepon || '112'}</Text>
+            </TouchableOpacity>
+          </View>
         </View>
 
         {/* Pos Medis */}
         <View style={styles.poskoCard}>
           <View>
-            <Text style={styles.poskoBadgeMedis}>DARURAT MEDIS</Text>
+            <View style={styles.poskoTopRow}>
+              <Text style={styles.poskoBadgeMedis}>DARURAT MEDIS</Text>
+              <View style={styles.badgeDistanceMini}>
+                <Text style={styles.distTextMini}>{formatDistance(poskoMedis)}</Text>
+              </View>
+            </View>
             <Text style={styles.poskoTitle} numberOfLines={2}>
               {poskoMedis?.properties.nama || 'Faskes RSUP Darurat'}
             </Text>
-            <Text style={styles.poskoMeta}>Jarak: {formatDistance(poskoMedis)}</Text>
           </View>
-          <TouchableOpacity
-            style={styles.callBtn}
-            onPress={() => handleCall(poskoMedis?.properties.kontak_telepon || '118')}
-            activeOpacity={0.7}
-          >
-            <Phone size={12} color="#38bdf8" />
-            <Text style={styles.callBtnText}>Panggil {poskoMedis?.properties.kontak_telepon || '118'}</Text>
-          </TouchableOpacity>
+          <View style={styles.poskoActionCol}>
+            {poskoMedis && (
+              <TouchableOpacity
+                style={styles.routeBtnMini}
+                onPress={() =>
+                  onOpenWebRoute({
+                    poskoId: poskoMedis.properties.id,
+                    lat: poskoMedis.geometry?.coordinates?.[1],
+                    lon: poskoMedis.geometry?.coordinates?.[0],
+                    nama: poskoMedis.properties.nama,
+                    jenis: poskoMedis.properties.jenis,
+                  })
+                }
+                activeOpacity={0.8}
+              >
+                <Navigation size={11} color="#ffffff" />
+                <Text style={styles.routeBtnMiniText}>Rute Evakuasi</Text>
+              </TouchableOpacity>
+            )}
+            <TouchableOpacity
+              style={styles.callBtn}
+              onPress={() => handleCall(poskoMedis?.properties.kontak_telepon || '118')}
+              activeOpacity={0.7}
+            >
+              <Phone size={11} color="#38bdf8" />
+              <Text style={styles.callBtnText}>Panggil {poskoMedis?.properties.kontak_telepon || '118'}</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </View>
     </View>
@@ -306,6 +380,43 @@ const styles = StyleSheet.create({
     color: colors.text.muted,
     marginTop: 2,
     marginBottom: 8,
+  },
+  poskoTopRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  badgeDistanceMini: {
+    backgroundColor: 'rgba(249, 115, 22, 0.15)',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: 'rgba(249, 115, 22, 0.3)',
+  },
+  distTextMini: {
+    fontSize: 9,
+    fontWeight: '800',
+    color: colors.brand.primary,
+  },
+  poskoActionCol: {
+    gap: 6,
+    marginTop: 8,
+  },
+  routeBtnMini: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.brand.primary,
+    paddingVertical: 6,
+    borderRadius: 8,
+    gap: 4,
+  },
+  routeBtnMiniText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#ffffff',
   },
   callBtn: {
     flexDirection: 'row',

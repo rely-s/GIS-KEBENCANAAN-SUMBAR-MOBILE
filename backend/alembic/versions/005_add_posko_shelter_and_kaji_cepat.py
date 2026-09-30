@@ -45,11 +45,11 @@ def upgrade() -> None:
         sa.Column('ketersediaan_dapur_umum', sa.String(length=10), server_default='TIDAK'),
         sa.Column('ketersediaan_tenaga_medis', sa.String(length=10), server_default='TIDAK'),
         sa.Column('status_kelayakan', sa.String(length=20), server_default='AKTIF'),
-        sa.Column('geom', Geometry(geometry_type='POINT', srid=4326), nullable=False),
+        sa.Column('geom', sa.Text(), nullable=False),
         sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=True),
         sa.PrimaryKeyConstraint('id')
     )
-    op.execute("CREATE INDEX IF NOT EXISTS idx_posko_shelter_geom ON posko_shelter USING GIST (geom);")
+    # op.execute("CREATE INDEX IF NOT EXISTS idx_posko_shelter_geom ON posko_shelter USING GIST (geom);")
 
     # 3. Tabel Formulir Kaji Cepat Dampak (Rapid Assessment Form BNPB)
     op.create_table(

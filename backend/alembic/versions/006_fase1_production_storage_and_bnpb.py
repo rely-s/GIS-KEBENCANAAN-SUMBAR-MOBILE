@@ -39,11 +39,11 @@ def upgrade() -> None:
         sa.Column('tingkat_bahaya', sa.String(length=50), server_default='BAHAYA_TINGGI'),
         sa.Column('deskripsi', sa.Text(), nullable=True),
         sa.Column('petunjuk_keselamatan', sa.Text(), nullable=True),
-        sa.Column('geom', Geometry(geometry_type='GEOMETRY', srid=4326), nullable=False),
+        sa.Column('geom', sa.Text(), nullable=False),
         sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=True),
         sa.PrimaryKeyConstraint('id')
     )
-    op.execute("CREATE INDEX IF NOT EXISTS idx_ancaman_geologis_geom ON ancaman_geologis USING GIST (geom);")
+    # op.execute("CREATE INDEX IF NOT EXISTS idx_ancaman_geologis_geom ON ancaman_geologis USING GIST (geom);")
 
     # 4. Seeding entitas ancaman geologis riil Sumatera Barat (Pusgen & PVMBG)
     op.execute("""

@@ -3,9 +3,9 @@ import * as maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { Protocol } from 'pmtiles';
 import type { LayerVisibilityState } from './types';
-import { 
-  sesarSemangkoGeoJSON, 
-  megathrustMentawaiGeoJSON, 
+import {
+  sesarSemangkoGeoJSON,
+  megathrustMentawaiGeoJSON,
   zonaTsunamiPadangGeoJSON,
   tsunamiRunUpGeoJSON,
   sesarBufferGeoJSON
@@ -59,6 +59,7 @@ interface MapCanvasProps {
   cuacaAlerts?: any[];
   isPickingLocation?: boolean;
   onPickLocation?: (coords: { lat: number; lng: number }) => void;
+  onUserLocationDetected?: (coords: { lat: number; lng: number; accuracy: number }) => void;
   onCoordinatesChange?: (coords: { lat: number; lng: number; zoom: number }) => void;
   onSelectWilayah?: (wilayahId: number, properties?: any) => void;
   onPoskoClick?: (posko: any) => void;
@@ -164,6 +165,7 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
   cuacaAlerts: _cuacaAlerts = [],
   isPickingLocation = false,
   onPickLocation,
+  onUserLocationDetected,
   onCoordinatesChange,
   onSelectWilayah,
   onPoskoClick,
@@ -1445,7 +1447,7 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
                 } else if (Array.isArray(props.fasilitas)) {
                   fasilitasParsed = props.fasilitas;
                 }
-              } catch (_) {}
+              } catch (_) { }
 
               onPoskoClickRef.current({
                 ...props,
@@ -1676,12 +1678,12 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
         // Amankan: Hanya query layer yang benar-benar ada di map untuk mencegah fatal error MapLibre:
         // "The layer '...' does not exist in the map's style and cannot be queried for features."
         const validCandidateLayers = [
-          'choropleth-kecamatan-fill', 
+          'choropleth-kecamatan-fill',
           'selected-boundaries-fill',  // FIX: Sertakan layer kecamatan aktif agar klik tidak memicu lookup ganda
           'posko-evakuasi-symbol',
-          'posko-evakuasi-circle', 
+          'posko-evakuasi-circle',
           'shelter-tes-symbol',
-          'shelter-tes-circle', 
+          'shelter-tes-circle',
           'jalan-terputus-line',
           'sesar-semangko-core',
           'megathrust-trench-line',
@@ -1718,7 +1720,7 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
                 }
               }
             })
-            .catch(() => {});
+            .catch(() => { });
         }
       });
     });
@@ -2086,9 +2088,9 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
         const el = document.createElement('div');
         el.className = 'gis-gempa-epicenter-marker group';
         el.title = `Pusat Gempa M ${gempaData.magnitude} - ${gempaData.wilayah_teks}`;
-        
+
         const isTsunami = !!gempaData.potensi_tsunami;
-        
+
         el.innerHTML = `
           <div style="position: relative; width: 64px; height: 64px; cursor: pointer; display: flex; align-items: center; justify-content: center;">
             <!-- 3 Cincin Gelombang Tsunami Ripple -->
@@ -2112,11 +2114,10 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
           <div style="font-family: 'Inter', -apple-system, sans-serif; width: 280px; box-sizing: border-box; color: #F8FAFC; padding: 4px;">
             <div style="display: flex; align-items: center; justify-content: space-between; gap: 5px; border-bottom: 1.5px solid rgba(239,68,68,0.4); padding-bottom: 6px; margin-bottom: 8px;">
               <span style="font-weight: 900; color: #EF4444; font-size: 12px; letter-spacing: 0.04em;">⚠️ BMKG TEWS LIVE SENSOR</span>
-              ${
-                isTsunami
-                  ? `<span style="background: #DC2626; color: #FFFFFF; font-size: 9px; font-weight: 900; padding: 2px 6px; border-radius: 4px; animation: pulse 1s infinite;">TSUNAMI</span>`
-                  : ''
-              }
+              ${isTsunami
+            ? `<span style="background: #DC2626; color: #FFFFFF; font-size: 9px; font-weight: 900; padding: 2px 6px; border-radius: 4px; animation: pulse 1s infinite;">TSUNAMI</span>`
+            : ''
+          }
             </div>
             <div style="font-weight: 900; font-size: 15px; color: #FFFFFF; margin-bottom: 4px;">
               Magnitudo ${gempaData.magnitude} M
@@ -2129,15 +2130,14 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
               Waktu Gempa: <span style="color: #F8FAFC;">${gempaData.waktu_kejadian}</span><br/>
               Koordinat: <span style="color: #38BDF8; font-family: monospace;">${gempaData.lat.toFixed(3)}°, ${gempaData.lon.toFixed(3)}°</span>
             </div>
-            ${
-              isTsunami
-                ? `<div style="background: rgba(220,38,38,0.3); color: #FCA5A5; border: 1.5px solid #EF4444; font-size: 10.5px; font-weight: 800; padding: 6px 8px; border-radius: 6px; text-align: center; letter-spacing: 0.04em;">
+            ${isTsunami
+            ? `<div style="background: rgba(220,38,38,0.3); color: #FCA5A5; border: 1.5px solid #EF4444; font-size: 10.5px; font-weight: 800; padding: 6px 8px; border-radius: 6px; text-align: center; letter-spacing: 0.04em;">
                     PERINGATAN DINI: BERPOTENSI TSUNAMI!
                    </div>`
-                : `<div style="background: rgba(16,185,129,0.15); color: #6EE7B7; border: 1px solid rgba(16,185,129,0.3); font-size: 10.5px; font-weight: 700; padding: 4px 6px; border-radius: 6px; text-align: center;">
+            : `<div style="background: rgba(16,185,129,0.15); color: #6EE7B7; border: 1px solid rgba(16,185,129,0.3); font-size: 10.5px; font-weight: 700; padding: 4px 6px; border-radius: 6px; text-align: center;">
                     Tidak Berpotensi Tsunami
                    </div>`
-            }
+          }
           </div>
         `);
 
@@ -2157,11 +2157,11 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
   // FlyTo Koordinat Terpilih (Animasi Halus, Terarah & Presisi Kartografis)
   useEffect(() => {
     if (!map.current || !flyToCoords) return;
-    const targetPitch = flyToCoords.pitch !== undefined 
-      ? flyToCoords.pitch 
-      : active3D 
-      ? 35 
-      : 0;
+    const targetPitch = flyToCoords.pitch !== undefined
+      ? flyToCoords.pitch
+      : active3D
+        ? 35
+        : 0;
 
     map.current.flyTo({
       center: [flyToCoords.lng, flyToCoords.lat],
@@ -2184,9 +2184,9 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
 
   return (
     <div className="relative w-full h-full bg-[#0F1720]">
-      <div 
-        ref={mapContainer} 
-        className="w-full h-full outline-none focus:ring-1 focus:ring-emerald-500/50" 
+      <div
+        ref={mapContainer}
+        className="w-full h-full outline-none focus:ring-1 focus:ring-emerald-500/50"
         id="maplibre-container"
         role="region"
         aria-label="Peta Interaktif Geospasial Kebencanaan Sumatera Barat"
@@ -2244,14 +2244,30 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
             if (navigator.geolocation) {
               navigator.geolocation.getCurrentPosition(
                 (pos) => {
+                  const rawLat = pos.coords.latitude;
+                  const rawLon = pos.coords.longitude;
+                  const accuracy = Math.round(pos.coords.accuracy);
+
+                  // Deteksi tertukar otomatis
+                  let finalLat = rawLat;
+                  let finalLon = rawLon;
+                  if (rawLat > 80 && rawLon < 20) {
+                    finalLat = rawLon;
+                    finalLon = rawLat;
+                  }
+
+                  if (onUserLocationDetected) {
+                    onUserLocationDetected({ lat: finalLat, lng: finalLon, accuracy });
+                  }
+
                   map.current?.flyTo({
-                    center: [pos.coords.longitude, pos.coords.latitude],
-                    zoom: 14,
+                    center: [finalLon, finalLat],
+                    zoom: 14.5,
                     essential: true,
                   });
                 },
                 (err) => console.warn('Geolocation sensor warning:', err.message),
-                { enableHighAccuracy: true, timeout: 8000 }
+                { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
               );
             }
           }}
@@ -2261,7 +2277,7 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
 
       {/* Floating Follower Tooltip saat Mode Penentuan Titik Aktif */}
       {isPickingLocation && mousePos && (
-        <div 
+        <div
           className="pointer-events-none absolute z-50 flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500 text-slate-950 font-bold text-xs shadow-2xl border-2 border-amber-200 transform -translate-x-1/2 -translate-y-12 animate-in fade-in duration-75 select-none"
           style={{ left: `${mousePos.x}px`, top: `${mousePos.y}px` }}
         >

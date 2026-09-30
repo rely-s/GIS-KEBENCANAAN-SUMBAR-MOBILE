@@ -87,17 +87,36 @@ async def chat_disaster_assistant(
     # 2. Pertanyaan seputar Shelter / Posko / Tempat Evakuasi
     if any(k in query for k in ["shelter", "posko", "evakuasi", "mengungsi", "aman", "kantor camat", "tes"]):
         # Cari shelter TES vertikal atau posko terdekat
-        res_posko = await db.execute(text("""
-            SELECT 
-                id, nama, jenis, kapasitas,
-                ST_Y(lokasi) AS lat, ST_X(lokasi) AS lon,
-                ROUND((ST_Distance(lokasi::geography, ST_SetSRID(ST_MakePoint(:lon, :lat), 4326)::geography) / 1000)::numeric, 2) AS jarak_km
-            FROM posko_evakuasi
-            WHERE status = 'aktif'
-            ORDER BY ST_Distance(lokasi::geography, ST_SetSRID(ST_MakePoint(:lon, :lat), 4326)::geography) ASC
-            LIMIT 3;
-        """), {"lat": user_lat, "lon": user_lng})
-        posko_list = res_posko.fetchall()
+        posko_list = []
+        try:
+            res_posko = await db.execute(text("""
+                SELECT 
+                    id, nama, jenis, kapasitas,
+                    ST_Y(lokasi) AS lat, ST_X(lokasi) AS lon,
+                    ROUND((ST_Distance(lokasi::geography, ST_SetSRID(ST_MakePoint(:lon, :lat), 4326)::geography) / 1000)::numeric, 2) AS jarak_km
+                FROM posko_evakuasi
+                WHERE status = 'aktif'
+                ORDER BY ST_Distance(lokasi::geography, ST_SetSRID(ST_MakePoint(:lon, :lat), 4326)::geography) ASC
+                LIMIT 3;
+            """), {"lat": user_lat, "lon": user_lng})
+            posko_list = res_posko.fetchall()
+        except Exception as e:
+            logger.debug(f"Chatbot posko db error, using curated fallback: {e}")
+
+        if not posko_list:
+            from app.services.routing_service import get_curated_nearest_shelters
+            curated = get_curated_nearest_shelters(user_lat, user_lng, limit=3)
+            # Konversi format
+            class CuratedWrapper:
+                def __init__(self, d):
+                    self.id = d["id"]
+                    self.nama = d["nama"]
+                    self.jenis = d.get("jenis", "shelter_tes_tea")
+                    self.kapasitas = d.get("kapasitas", 1000)
+                    self.lat = d["lat"]
+                    self.lon = d["lon"]
+                    self.jarak_km = d.get("jarak_km", round(d.get("jarak_garis_lurus_m", 0) / 1000.0, 2))
+            posko_list = [CuratedWrapper(c) for c in curated]
 
         if posko_list:
             top_posko = posko_list[0]

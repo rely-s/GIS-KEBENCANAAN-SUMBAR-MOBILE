@@ -33,7 +33,7 @@ export function calculateLocalHaversineKm(lat1: number, lon1: number, lat2: numb
     Math.cos(lat1 * (Math.PI / 180)) * Math.cos(lat2 * (Math.PI / 180)) *
     Math.sin(dLon / 2) * Math.sin(dLon / 2);
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  return Number((R * c).toFixed(1));
+  return Number((R * c).toFixed(2));
 }
 
 // Data Geometri Kunci Sumatera Barat untuk Kalkulasi Mandiri (Offline)
@@ -222,15 +222,34 @@ export async function fetchShelters(lat: number, lon: number): Promise<PoskoResp
 }
 
 /**
- * Kirim laporan kejadian warga ke backend
+ * Kirim laporan kejadian warga ke backend PostgreSQL Pusdalops
  */
-export async function sendLaporanKejadian(payload: LaporWargaPayload): Promise<{ success: boolean; message: string; id?: number }> {
+export async function sendLaporanKejadian(payload: LaporWargaPayload): Promise<{ success: boolean; message: string; id?: number; ticket_id?: string }> {
   try {
     const res = await apiClient.post('/bencana/lapor', payload);
-    return { success: true, message: 'Laporan berhasil diterima oleh Pusdalops BPBD', id: res.data?.id || res.data?.bencana_id };
+    return {
+      success: true,
+      message: res.data?.message || 'Laporan berhasil diterima oleh Pusdalops BPBD',
+      id: res.data?.id || res.data?.bencana_id,
+      ticket_id: res.data?.ticket_id,
+    };
   } catch (err: any) {
     const msg = err.response?.data?.error?.message || 'Gagal terhubung ke server. Laporan tersimpan di antrean offline HP.';
     return { success: false, message: msg };
+  }
+}
+
+/**
+ * Cek status validasi laporan dari petugas BPBD (menunggu / terverifikasi / ditolak)
+ */
+export async function fetchStatusLaporan(bencanaId: number | string): Promise<any | null> {
+  try {
+    const numId = typeof bencanaId === 'string' ? parseInt(bencanaId.replace(/\D/g, ''), 10) : bencanaId;
+    if (!numId || isNaN(numId)) return null;
+    const res = await apiClient.get(`/bencana/laporan/status/${numId}`);
+    return res.data;
+  } catch (err) {
+    return null;
   }
 }
 

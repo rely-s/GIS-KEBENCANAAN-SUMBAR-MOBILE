@@ -146,7 +146,7 @@ async def get_verifikasi_queue(
             "wilayah": r.wilayah_nama or "Sumatera Barat",
             "deskripsi": r.deskripsi,
             "sumber_data": r.sumber_data,
-            "pelapor": r.pelapor_nama or "Petugas Lapangan",
+            "pelapor": r.pelapor_nama or ("Laporan Warga (Mobile App)" if r.sumber_data == "laporan_warga" else "Petugas Lapangan BPBD"),
             "status": r.status_verifikasi,
             "foto_url": r.foto_url,
             "lat": float(r.lat) if r.lat != 0 else None,

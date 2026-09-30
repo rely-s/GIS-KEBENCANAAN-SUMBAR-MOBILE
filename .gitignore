@@ -67,3 +67,10 @@ graphify-out/2026-*/
 backend/uploads/
 test_tile.mvt
 
+
+# Database & Scripts
+data_pg/
+backups/
+fix_pass.py
+mock_postgis.sql
+patch*.py

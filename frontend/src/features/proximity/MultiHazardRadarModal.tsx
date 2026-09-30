@@ -16,35 +16,23 @@ import {
   Info
 } from 'lucide-react';
 
+import { 
+  calculateHaversineDistanceKm
+} from '../../utils/geoUtils';
+
 export interface MultiHazardRadarModalProps {
   isOpen: boolean;
   onClose: () => void;
   userCoords: { lat: number; lng: number } | null;
   onPickLocationOnMap: () => void;
-  onStartRouteTo: (dest: { lat: number; lng: number; nama: string }) => void;
+  onStartRouteTo: (dest: { lat: number; lng: number; nama: string; id?: number }) => void;
   bencanaList?: any[];
   poskoList?: any[];
   jalanList?: any[];
 }
 
-export function calculateDistanceKm(
-  lat1: number,
-  lon1: number,
-  lat2: number,
-  lon2: number
-): number {
-  const R = 6371; // Radius bumi (km)
-  const dLat = ((lat2 - lat1) * Math.PI) / 180;
-  const dLon = ((lon2 - lon1) * Math.PI) / 180;
-  const a =
-    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.cos((lat1 * Math.PI) / 180) *
-      Math.cos((lat2 * Math.PI) / 180) *
-      Math.sin(dLon / 2) *
-      Math.sin(dLon / 2);
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  return R * c;
-}
+// Alias untuk kompatibilitas internal
+export const calculateDistanceKm = calculateHaversineDistanceKm;
 
 // Master Titik Bahaya Geologis & Vulkanik Sumatera Barat (Berdasarkan Kajian PVMBG & BPBD)
 const GEOLOGICAL_FAULTS = [

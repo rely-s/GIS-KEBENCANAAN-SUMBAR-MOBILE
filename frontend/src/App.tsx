@@ -21,6 +21,13 @@ import { DetailJalanSheet, type JalanTerputusDetailData } from './features/map/c
 import { DetailAncamanSheet, type AncamanDetailData } from './features/map/components/DetailAncamanSheet';
 import { AccessibleShelterModal } from './features/accessibility/AccessibleShelterModal';
 import { 
+  normalizeCoordinates, 
+  isWithinSumbar, 
+  calculateHaversineDistanceKm, 
+  logDistanceAudit,
+  DEFAULT_SUMBAR_COORDS 
+} from './utils/geoUtils';
+import { 
   Building2,
   Compass, 
   Server,
@@ -82,11 +89,74 @@ export function App() {
   // ==========================================
   const [routeData, setRouteData] = useState<EvakuasiRouteData | null>(null);
   const [loadingEvakuasi, setLoadingEvakuasi] = useState(false);
-  const [userCoords, setUserCoords] = useState<{ lat: number; lng: number } | null>(null);
+  const [userCoords, setUserCoords] = useState<{ lat: number; lng: number; accuracy?: number } | null>(null);
+  const [userAccuracy, setUserAccuracy] = useState<number | null>(null);
+  const [isGpsLive, setIsGpsLive] = useState<boolean>(false);
   const [poskoCoords, setPoskoCoords] = useState<{ lat: number; lng: number; nama?: string } | null>(null);
   const [jalanVersion, setJalanVersion] = useState(0);
   const [poskoVersion, setPoskoVersion] = useState(0);
   const [bencanaVersion, setBencanaVersion] = useState(0);
+
+  // Sensor Geolocation Presisi Tinggi Real-Time (HTML5 GPS Tracking)
+  useEffect(() => {
+    if (!navigator.geolocation) return;
+
+    // 1. Dapatkan posisi awal segera
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const rawLat = pos.coords.latitude;
+        const rawLon = pos.coords.longitude;
+        const accuracy = Math.round(pos.coords.accuracy);
+
+        const normalized = normalizeCoordinates(rawLat, rawLon);
+        if (!normalized) return;
+
+        const { lat, lng } = normalized;
+        setUserAccuracy(accuracy);
+        setIsGpsLive(true);
+
+        if (isWithinSumbar(lat, lng)) {
+          setUserCoords({ lat, lng, accuracy });
+        } else {
+          // Lokasi di luar Sumbar (misal testing): Set default simulasi Padang Barat
+          setUserCoords({ lat: DEFAULT_SUMBAR_COORDS.lat, lng: DEFAULT_SUMBAR_COORDS.lng, accuracy });
+        }
+      },
+      (err) => {
+        console.warn('GPS initial position warning:', err.message);
+        setUserCoords({ lat: DEFAULT_SUMBAR_COORDS.lat, lng: DEFAULT_SUMBAR_COORDS.lng, accuracy: undefined });
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+    );
+
+    // 2. Pasang watchPosition untuk pembaruan berkelanjutan tanpa jeda
+    const watchId = navigator.geolocation.watchPosition(
+      (pos) => {
+        const rawLat = pos.coords.latitude;
+        const rawLon = pos.coords.longitude;
+        const accuracy = Math.round(pos.coords.accuracy);
+
+        const normalized = normalizeCoordinates(rawLat, rawLon);
+        if (!normalized) return;
+
+        const { lat, lng } = normalized;
+        setUserAccuracy(accuracy);
+        setIsGpsLive(true);
+
+        if (isWithinSumbar(lat, lng)) {
+          setUserCoords({ lat, lng, accuracy });
+        }
+      },
+      (err) => {
+        console.warn('GPS continuous watch warning:', err.message);
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+    );
+
+    return () => {
+      navigator.geolocation.clearWatch(watchId);
+    };
+  }, []);
 
   // State Detail Interactive Bottom Sheets (Touchscreen-Friendly Lapangan)
   const [selectedPoskoSheet, setSelectedPoskoSheet] = useState<PoskoDetailData | null>(null);
@@ -143,27 +213,83 @@ export function App() {
     }
   });
 
-  // Support Handoff dari Aplikasi Mobile: ?view=mobile_lite&lat=...&lon=...&zoom=...
+  // Support Handoff dari Aplikasi Mobile: ?view=mobile_lite&action=evakuasi&userLat=...&destLat=...
   const [isMobileLiteView, setIsMobileLiteView] = useState(false);
 
   useEffect(() => {
     try {
       const params = new URLSearchParams(window.location.search);
       const viewParam = params.get('view');
-      const latParam = params.get('lat');
-      const lonParam = params.get('lon');
+      const actionParam = params.get('action');
+      const userLatParam = params.get('userLat') || params.get('lat');
+      const userLonParam = params.get('userLon') || params.get('lon');
+      const destLatParam = params.get('destLat');
+      const destLonParam = params.get('destLon');
+      const destNamaParam = params.get('destNama');
+      const poskoIdParam = params.get('poskoId');
+      const bencanaParam = params.get('bencana');
       const zoomParam = params.get('zoom');
+      const layerParam = params.get('layer');
 
       if (viewParam === 'mobile_lite') {
         setIsMobileLiteView(true);
       }
-      if (latParam && lonParam) {
-        const parsedLat = parseFloat(latParam);
-        const parsedLon = parseFloat(lonParam);
-        const parsedZoom = zoomParam ? parseFloat(zoomParam) : 15;
+
+      if (layerParam) {
+        const layers = layerParam.split(',');
+        setLayerVisibility((prev) => {
+          const next = { ...prev };
+          layers.forEach((l) => {
+            const key = l.trim() as keyof LayerVisibilityState;
+            if (key in next) next[key] = true;
+          });
+          return next;
+        });
+      }
+
+      let uLat: number | null = null;
+      let uLon: number | null = null;
+      if (userLatParam && userLonParam) {
+        const parsedLat = parseFloat(userLatParam);
+        const parsedLon = parseFloat(userLonParam);
         if (!isNaN(parsedLat) && !isNaN(parsedLon)) {
-          setFlyToCoords({ lat: parsedLat, lng: parsedLon, zoom: parsedZoom });
+          const norm = normalizeCoordinates(parsedLat, parsedLon);
+          if (norm) {
+            uLat = norm.lat;
+            uLon = norm.lng;
+            setUserCoords({ lat: norm.lat, lng: norm.lng });
+            setFlyToCoords({ lat: norm.lat, lng: norm.lng, zoom: zoomParam ? parseFloat(zoomParam) : 15 });
+          }
         }
+      }
+
+      if (destLatParam && destLonParam) {
+        const parsedDestLat = parseFloat(destLatParam);
+        const parsedDestLon = parseFloat(destLonParam);
+        if (!isNaN(parsedDestLat) && !isNaN(parsedDestLon)) {
+          const normDest = normalizeCoordinates(parsedDestLat, parsedDestLon);
+          if (normDest) {
+            const targetName = destNamaParam || 'Shelter / Posko Evakuasi';
+            setPoskoCoords({ lat: normDest.lat, lng: normDest.lng, nama: targetName });
+            if (actionParam === 'evakuasi') {
+              const startLat = uLat ?? DEFAULT_SUMBAR_COORDS.lat;
+              const startLon = uLon ?? DEFAULT_SUMBAR_COORDS.lng;
+              hitungRute(
+                startLat,
+                startLon,
+                'jalan_kaki',
+                undefined,
+                bencanaParam || 'tsunami',
+                normDest.lat,
+                normDest.lng,
+                targetName,
+                poskoIdParam ? parseInt(poskoIdParam, 10) : undefined
+              );
+            }
+          }
+        }
+      } else if (actionParam === 'evakuasi' && uLat && uLon) {
+        hitungRute(uLat, uLon, 'jalan_kaki', undefined, bencanaParam || 'tsunami');
       }
     } catch (_) {}
   }, []);
@@ -251,13 +377,7 @@ export function App() {
     let nearest = threats[0];
 
     for (const t of threats) {
-      const dLat = (t.lat - targetLat) * (Math.PI / 180);
-      const dLon = (t.lng - targetLng) * (Math.PI / 180);
-      const a =
-        Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-        Math.cos(targetLat * (Math.PI / 180)) * Math.cos(t.lat * (Math.PI / 180)) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
-      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-      const dKm = 6371 * c;
+      const dKm = calculateHaversineDistanceKm(targetLat, targetLng, t.lat, t.lng);
       if (dKm < minDistanceKm) {
         minDistanceKm = dKm;
         nearest = t;
@@ -709,19 +829,38 @@ export function App() {
   };
 
   // ==========================================
-  // FITUR UTAMA: EVAKUASI MULTI-ALUR (ALUR A TSUNAMI vs ALUR B NON-TSUNAMI)
+  // FITUR UTAMA: EVAKUASI MULTI-ALUR (ALUR A TSUNAMI vs ALUR B NON-TSUNAMI & DIRECT ROUTING)
   // ==========================================
   const hitungRute = (
     lat?: number, 
     lon?: number, 
     targetModa: 'mobil' | 'jalan_kaki' = evakuasiModa,
     kecamatanId?: number | string,
-    targetJenisBencana?: string
+    targetJenisBencana?: string,
+    destLat?: number,
+    destLon?: number,
+    destNama?: string,
+    poskoId?: number
   ) => {
     setLoadingEvakuasi(true);
+
+    // 1. Validasi & Normalisasi Koordinat Titik Asal Pengguna
+    let validUserLat = lat ?? userCoords?.lat;
+    let validUserLon = lon ?? userCoords?.lng;
+
     if (lat !== undefined && lon !== undefined) {
-      setUserCoords({ lat, lng: lon });
+      const normalized = normalizeCoordinates(lat, lon);
+      if (normalized) {
+        validUserLat = normalized.lat;
+        validUserLon = normalized.lng;
+      }
+      setUserCoords({ 
+        lat: validUserLat ?? DEFAULT_SUMBAR_COORDS.lat, 
+        lng: validUserLon ?? DEFAULT_SUMBAR_COORDS.lng, 
+        accuracy: userAccuracy ?? undefined 
+      });
     }
+
     if (targetModa) {
       setEvakuasiModa(targetModa);
     }
@@ -732,12 +871,24 @@ export function App() {
       moda: targetModa,
       jenis_bencana: jenisToUse,
     };
-    if (lat !== undefined && lon !== undefined) {
-      payload.lat = lat;
-      payload.lon = lon;
+
+    if (validUserLat !== undefined && validUserLon !== undefined) {
+      payload.lat = validUserLat;
+      payload.lon = validUserLon;
     }
     if (kecamatanId !== undefined) {
       payload.kecamatan_id = kecamatanId;
+    }
+    if (destLat !== undefined && destLon !== undefined) {
+      const normDest = normalizeCoordinates(destLat, destLon);
+      payload.dest_lat = normDest ? normDest.lat : destLat;
+      payload.dest_lon = normDest ? normDest.lng : destLon;
+    }
+    if (destNama) {
+      payload.dest_nama = destNama;
+    }
+    if (poskoId !== undefined) {
+      payload.posko_id = poskoId;
     }
 
     fetch('/api/routing/evakuasi', {
@@ -758,11 +909,38 @@ export function App() {
             nama: data.posko.nama
           });
         }
-        // Jika koordinat rute tersedia dan userCoords belum ada, set userCoords dari koordinat awal geometri
-        if ((lat === undefined || lon === undefined) && data.geometry?.coordinates?.length > 0) {
-          const firstCoord = data.geometry.coordinates[0];
-          setUserCoords({ lat: firstCoord[1], lng: firstCoord[0] });
+
+        const effectiveUserLat = validUserLat ?? DEFAULT_SUMBAR_COORDS.lat;
+        const effectiveUserLon = validUserLon ?? DEFAULT_SUMBAR_COORDS.lng;
+
+        // Set userCoords jika belum ada
+        if (!userCoords) {
+          setUserCoords({ lat: effectiveUserLat, lng: effectiveUserLon, accuracy: userAccuracy ?? undefined });
         }
+
+        // 2. Audit Jarak & Debugging Log (Perbandingan Geodesic Haversine vs OSRM Road Routing)
+        if (data.posko) {
+          const straightDist = calculateHaversineDistanceKm(
+            effectiveUserLat,
+            effectiveUserLon,
+            data.posko.lat,
+            data.posko.lon
+          );
+
+          logDistanceAudit({
+            userLatitude: effectiveUserLat,
+            userLongitude: effectiveUserLon,
+            userAccuracy: userAccuracy,
+            destinationLatitude: data.posko.lat,
+            destinationLongitude: data.posko.lon,
+            destinationName: data.posko.nama,
+            calculatedStraightDistanceKm: straightDist,
+            displayedDistanceKm: data.jarak_km,
+            calculationMethod: data.routing_engine === 'haversine_direct_fallback' ? 'haversine_geodesic' : 'osrm_road_network',
+            disasterProtocol: data.alur
+          });
+        }
+
         // Tutup panel drill-down dan modal evakuasi agar peta dan rute fokus
         setSelectedWilayahId(null);
         setWilayahDampak(null);
@@ -782,25 +960,51 @@ export function App() {
   };
 
   const handleStartEvakuasiFromModal = (params: EvakuasiStartParams) => {
-    hitungRute(params.lat, params.lon, params.moda, params.kecamatan_id, params.jenis_bencana);
+    hitungRute(
+      params.lat, 
+      params.lon, 
+      params.moda, 
+      params.kecamatan_id, 
+      params.jenis_bencana,
+      params.dest_lat,
+      params.dest_lon,
+      params.dest_nama,
+      params.posko_id
+    );
   };
 
   const handleEvakuasiSekarang = (targetModa: 'mobil' | 'jalan_kaki' = evakuasiModa) => {
-    // Minta koordinat GPS pengguna via Geolocation API
+    // Minta koordinat GPS pengguna via Geolocation API presisi tinggi
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         (pos) => {
-          hitungRute(pos.coords.latitude, pos.coords.longitude, targetModa);
+          const rawLat = pos.coords.latitude;
+          const rawLon = pos.coords.longitude;
+          const accuracy = Math.round(pos.coords.accuracy);
+          setUserAccuracy(accuracy);
+          setIsGpsLive(true);
+
+          const normalized = normalizeCoordinates(rawLat, rawLon);
+          const validLat = normalized ? normalized.lat : rawLat;
+          const validLon = normalized ? normalized.lng : rawLon;
+
+          const isSumbar = isWithinSumbar(validLat, validLon);
+          const lat = isSumbar ? validLat : DEFAULT_SUMBAR_COORDS.lat;
+          const lon = isSumbar ? validLon : DEFAULT_SUMBAR_COORDS.lng;
+
+          setUserCoords({ lat, lng: lon, accuracy });
+          hitungRute(lat, lon, targetModa);
         },
         (err) => {
           console.warn('Izin GPS ditolak atau tidak tersedia, menggunakan koordinat pusat Padang Barat (Simulasi):', err.message);
-          // Fallback realistis: Padang Barat (-0.9471, 100.3543)
-          hitungRute(-0.9471, 100.3543, targetModa);
+          setUserCoords({ lat: DEFAULT_SUMBAR_COORDS.lat, lng: DEFAULT_SUMBAR_COORDS.lng, accuracy: undefined });
+          hitungRute(DEFAULT_SUMBAR_COORDS.lat, DEFAULT_SUMBAR_COORDS.lng, targetModa);
         },
-        { timeout: 6000, enableHighAccuracy: true }
+        { timeout: 10000, enableHighAccuracy: true, maximumAge: 0 }
       );
     } else {
-      hitungRute(-0.9471, 100.3543, targetModa);
+      setUserCoords({ lat: DEFAULT_SUMBAR_COORDS.lat, lng: DEFAULT_SUMBAR_COORDS.lng, accuracy: undefined });
+      hitungRute(DEFAULT_SUMBAR_COORDS.lat, DEFAULT_SUMBAR_COORDS.lng, targetModa);
     }
   };
 
@@ -1087,6 +1291,20 @@ export function App() {
             </span>
           </button>
 
+          {/* Status Akurasi GPS Live */}
+          {userCoords && (
+            <div 
+              className="hidden lg:flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-[#0B131D]/90 border border-[#2B3E52] text-xs font-mono text-slate-300 shadow-md"
+              title={`Lokasi Pengguna: ${userCoords.lat.toFixed(5)}, ${userCoords.lng.toFixed(5)} (Akurasi: ±${userAccuracy ?? userCoords.accuracy ?? 0}m)`}
+            >
+              <Navigation className={`w-3.5 h-3.5 ${isGpsLive ? 'text-emerald-400' : 'text-sky-400'}`} />
+              <span className="text-[11px] text-slate-300 font-semibold">
+                ±{userAccuracy ?? userCoords.accuracy ?? 0}m
+              </span>
+              <span className={`w-1.5 h-1.5 rounded-full ${isGpsLive ? 'bg-emerald-400 animate-pulse' : 'bg-sky-400'}`} />
+            </div>
+          )}
+
           {/* Status Server */}
           <div 
             className="flex items-center gap-1.5 px-2 py-1.5 rounded-xl bg-[#0B131D]/90 border border-[#2B3E52] text-xs font-mono text-slate-300 shadow-md"
@@ -1208,6 +1426,11 @@ export function App() {
           cuacaAlerts={cuacaAlerts}
           isPickingLocation={isPickingLocationOnMap}
           onPickLocation={handleLocationPicked}
+          onUserLocationDetected={(detected) => {
+            setUserCoords(detected);
+            setUserAccuracy(detected.accuracy);
+            setIsGpsLive(true);
+          }}
           onCoordinatesChange={(c) => setCoords(c)}
           onSelectWilayah={(id, props) => handleSelectWilayah(id, props)}
           onPoskoClick={handlePoskoClick}
@@ -1288,17 +1511,21 @@ export function App() {
             }
           }}
           onStartEvakuasiRoute={(posko) => {
-            // Tutup panel wilayah dan mulai hitung rute ke posko terpilih
+            // Tutup panel wilayah dan mulai hitung rute langsung ke posko tujuan
             setSelectedWilayahId(null);
             setWilayahDampak(null);
+            setPoskoCoords({ lat: posko.lat, lng: posko.lng, nama: posko.nama });
             hitungRute(
               userCoords?.lat,
               userCoords?.lng,
               evakuasiModa,
-              typeof activeKecamatanInfo?.id === 'number' ? activeKecamatanInfo.id : undefined
+              typeof activeKecamatanInfo?.id === 'number' ? activeKecamatanInfo.id : undefined,
+              undefined,
+              posko.lat,
+              posko.lng,
+              posko.nama,
+              posko.id
             );
-            // Set posko tujuan langsung
-            setPoskoCoords({ lat: posko.lat, lng: posko.lng, nama: posko.nama });
             setFlyToCoords({ lat: posko.lat, lng: posko.lng, zoom: 14 });
           }}
         />
@@ -1512,8 +1739,19 @@ export function App() {
           setIsPickingLocationOnMap(true);
         }}
         onStartRouteTo={(dest) => {
+          setIsRadarModalOpen(false);
           setPoskoCoords({ lat: dest.lat, lng: dest.lng, nama: dest.nama });
-          hitungRute(userCoords?.lat, userCoords?.lng, evakuasiModa);
+          hitungRute(
+            userCoords?.lat,
+            userCoords?.lng,
+            evakuasiModa,
+            undefined,
+            undefined,
+            dest.lat,
+            dest.lng,
+            dest.nama,
+            dest.id
+          );
           setFlyToCoords({ lat: dest.lat, lng: dest.lng, zoom: 14 });
         }}
         bencanaList={radarBencanaList}

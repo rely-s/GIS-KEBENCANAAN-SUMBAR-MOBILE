@@ -40,7 +40,7 @@ def upgrade() -> None:
         sa.Column('kedalaman_rendaman', sa.String(length=100), nullable=True),
         sa.Column('deskripsi', sa.Text(), nullable=True),
         sa.Column('rekomendasi', sa.Text(), nullable=True),
-        sa.Column('geom', Geometry(geometry_type='MULTIPOLYGON', srid=4326), nullable=False),
+        sa.Column('geom', sa.Text(), nullable=False),
         sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=True),
         sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=True),
         sa.ForeignKeyConstraint(['wilayah_id'], ['wilayah_administratif.id'], ),

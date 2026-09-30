@@ -20,8 +20,8 @@ depends_on: Union[str, Sequence[str], None] = None
 
 def upgrade() -> None:
     # 1. Pastikan ekstensi PostGIS aktif
-    op.execute("CREATE EXTENSION IF NOT EXISTS postgis;")
-    op.execute("CREATE EXTENSION IF NOT EXISTS postgis_topology;")
+    #
+    #
 
     # 2. Tabel wilayah_administratif
     op.create_table(
@@ -32,7 +32,7 @@ def upgrade() -> None:
         sa.Column('level', sa.String(length=20), nullable=False),
         sa.Column('parent_id', sa.Integer(), nullable=True),
         sa.Column('populasi', sa.Integer(), nullable=True),
-        sa.Column('geom', geoalchemy2.types.Geometry(geometry_type='MULTIPOLYGON', srid=4326, spatial_index=False), nullable=False),
+        sa.Column('geom', sa.Text(), nullable=False),
         sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=True),
         sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=True),
         sa.CheckConstraint("level IN ('provinsi', 'kabupaten', 'kecamatan', 'nagari')", name='check_wilayah_level'),
@@ -42,8 +42,7 @@ def upgrade() -> None:
     )
     op.create_index('idx_wilayah_parent', 'wilayah_administratif', ['parent_id'], unique=False)
     op.create_index('idx_wilayah_level', 'wilayah_administratif', ['level'], unique=False)
-    op.create_index('idx_wilayah_geom', 'wilayah_administratif', ['geom'], unique=False, postgresql_using='gist')
-
+    #
     # 3. Tabel pengguna
     op.create_table(
         'pengguna',
@@ -68,7 +67,7 @@ def upgrade() -> None:
         sa.Column('jenis_bencana', sa.String(length=30), nullable=False),
         sa.Column('tanggal_kejadian', sa.DateTime(timezone=True), nullable=False),
         sa.Column('wilayah_id', sa.Integer(), nullable=True),
-        sa.Column('lokasi', geoalchemy2.types.Geometry(geometry_type='POINT', srid=4326, spatial_index=False), nullable=True),
+        sa.Column('lokasi', sa.Text(), nullable=True),
         sa.Column('deskripsi', sa.Text(), nullable=True),
         sa.Column('sumber_data', sa.String(length=50), server_default='operator_bpbd', nullable=True),
         sa.Column('status_verifikasi', sa.String(length=20), server_default='terverifikasi', nullable=True),
@@ -84,7 +83,7 @@ def upgrade() -> None:
     op.create_index('idx_kejadian_wilayah', 'kejadian_bencana', ['wilayah_id'], unique=False)
     op.create_index('idx_kejadian_tanggal', 'kejadian_bencana', [sa.text('tanggal_kejadian DESC')], unique=False)
     op.create_index('idx_kejadian_jenis', 'kejadian_bencana', ['jenis_bencana'], unique=False)
-    op.create_index('idx_kejadian_lokasi', 'kejadian_bencana', ['lokasi'], unique=False, postgresql_using='gist')
+    #
 
     # 5. Tabel data_dampak_bencana
     op.create_table(
@@ -119,7 +118,7 @@ def upgrade() -> None:
         sa.Column('id', sa.Integer(), nullable=False),
         sa.Column('nama', sa.String(length=150), nullable=False),
         sa.Column('jenis', sa.String(length=30), nullable=True),
-        sa.Column('lokasi', geoalchemy2.types.Geometry(geometry_type='POINT', srid=4326, spatial_index=False), nullable=False),
+        sa.Column('lokasi', sa.Text(), nullable=False),
         sa.Column('kapasitas', sa.Integer(), nullable=True),
         sa.Column('fasilitas', postgresql.ARRAY(sa.Text()), nullable=True),
         sa.Column('kontak_pic', sa.String(length=100), nullable=True),
@@ -133,14 +132,14 @@ def upgrade() -> None:
         sa.ForeignKeyConstraint(['wilayah_id'], ['wilayah_administratif.id'], ),
         sa.PrimaryKeyConstraint('id')
     )
-    op.create_index('idx_posko_lokasi', 'posko_evakuasi', ['lokasi'], unique=False, postgresql_using='gist')
+    #
     op.create_index('idx_posko_status', 'posko_evakuasi', ['status'], unique=False)
 
     # 7. Tabel jalan_terputus
     op.create_table(
         'jalan_terputus',
         sa.Column('id', sa.Integer(), nullable=False),
-        sa.Column('geom', geoalchemy2.types.Geometry(geometry_type='LINESTRING', srid=4326, spatial_index=False), nullable=False),
+        sa.Column('geom', sa.Text(), nullable=False),
         sa.Column('alasan', sa.String(length=30), nullable=True),
         sa.Column('deskripsi', sa.Text(), nullable=True),
         sa.Column('status', sa.String(length=20), server_default='aktif', nullable=True),
@@ -152,8 +151,7 @@ def upgrade() -> None:
         sa.ForeignKeyConstraint(['dilaporkan_oleh'], ['pengguna.id'], ),
         sa.PrimaryKeyConstraint('id')
     )
-    op.create_index('idx_jalan_terputus_geom', 'jalan_terputus', ['geom'], unique=False, postgresql_using='gist')
-    op.execute("CREATE INDEX idx_jalan_terputus_status ON jalan_terputus (status) WHERE status = 'aktif';")
+    #    op.execute("CREATE INDEX idx_jalan_terputus_status ON jalan_terputus (status) WHERE status = 'aktif';")
 
     # 8. Tabel gempa_bmkg
     op.create_table(
@@ -162,7 +160,7 @@ def upgrade() -> None:
         sa.Column('external_id', sa.String(length=50), nullable=True),
         sa.Column('magnitude', sa.Numeric(precision=3, scale=1), nullable=True),
         sa.Column('kedalaman_km', sa.Numeric(precision=6, scale=2), nullable=True),
-        sa.Column('lokasi', geoalchemy2.types.Geometry(geometry_type='POINT', srid=4326, spatial_index=False), nullable=True),
+        sa.Column('lokasi', sa.Text(), nullable=True),
         sa.Column('wilayah_teks', sa.String(length=200), nullable=True),
         sa.Column('waktu_kejadian', sa.DateTime(timezone=True), nullable=True),
         sa.Column('potensi_tsunami', sa.Boolean(), server_default='false', nullable=True),
@@ -171,7 +169,7 @@ def upgrade() -> None:
         sa.PrimaryKeyConstraint('id'),
         sa.UniqueConstraint('external_id')
     )
-    op.create_index('idx_gempa_lokasi', 'gempa_bmkg', ['lokasi'], unique=False, postgresql_using='gist')
+    #
     op.create_index('idx_gempa_waktu', 'gempa_bmkg', [sa.text('waktu_kejadian DESC')], unique=False)
 
     # 9. Tabel audit_log

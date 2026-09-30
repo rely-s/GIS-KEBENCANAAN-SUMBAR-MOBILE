@@ -1,19 +1,40 @@
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
-import { Waves, Mountain, CloudRain, Activity, Home } from 'lucide-react-native';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { Waves, Mountain, CloudRain, Activity, Home, Building2, Navigation, ChevronRight } from 'lucide-react-native';
 import { colors } from '../theme/colors';
 import { ThreatItem } from '../types';
+
+export interface FacilityRouteTarget {
+  id?: number;
+  nama: string;
+  lat?: number;
+  lon?: number;
+  jenis?: string;
+  bencana?: string;
+}
 
 interface DistanceGridProps {
   threats: ThreatItem[];
   nearestShelterKm: number;
   shelterName: string;
+  shelterTarget?: FacilityRouteTarget;
+  nearestPoskoKm?: number;
+  poskoName?: string;
+  poskoTarget?: FacilityRouteTarget;
+  onOpenRoute?: (target: FacilityRouteTarget) => void;
+  onSelectHazard?: (hazardType: string) => void;
 }
 
 export const DistanceGrid: React.FC<DistanceGridProps> = ({
   threats,
   nearestShelterKm,
   shelterName,
+  shelterTarget,
+  nearestPoskoKm = 1.2,
+  poskoName = 'Posko Komando BPBD',
+  poskoTarget,
+  onOpenRoute,
+  onSelectHazard,
 }) => {
   const getThreat = (type: string) => {
     return threats.find((item) => {
@@ -60,7 +81,11 @@ export const DistanceGrid: React.FC<DistanceGridProps> = ({
       {/* 4 Hazards Grid */}
       <View style={styles.grid}>
         {/* Tsunami */}
-        <View style={styles.card}>
+        <TouchableOpacity
+          style={styles.card}
+          onPress={() => onSelectHazard && onSelectHazard('tsunami')}
+          activeOpacity={0.75}
+        >
           <View style={styles.cardTop}>
             <View style={[styles.iconBox, { backgroundColor: 'rgba(6, 182, 212, 0.15)' }]}>
               <Waves size={16} color={colors.category.tsunami} />
@@ -77,11 +102,21 @@ export const DistanceGrid: React.FC<DistanceGridProps> = ({
           <Text style={[styles.distValue, { color: tsunamiStatus.color }]}>
             {findDist('tsunami', 1.9)}
           </Text>
-          <Text style={styles.subtext}>Pesisir Padang</Text>
-        </View>
+          <View style={styles.cardFooterRow}>
+            <Text style={styles.subtext}>Pesisir Padang</Text>
+            <View style={styles.navHintRow}>
+              <Navigation size={10} color={colors.brand.primary} />
+              <Text style={styles.navHintText}>Rute</Text>
+            </View>
+          </View>
+        </TouchableOpacity>
 
         {/* Sesar Semangko */}
-        <View style={styles.card}>
+        <TouchableOpacity
+          style={styles.card}
+          onPress={() => onSelectHazard && onSelectHazard('gempa')}
+          activeOpacity={0.75}
+        >
           <View style={styles.cardTop}>
             <View style={[styles.iconBox, { backgroundColor: 'rgba(168, 85, 247, 0.15)' }]}>
               <Activity size={16} color={colors.category.sesar} />
@@ -98,11 +133,21 @@ export const DistanceGrid: React.FC<DistanceGridProps> = ({
           <Text style={[styles.distValue, { color: sesarStatus.color }]}>
             {findDist('sesar', 36.0)}
           </Text>
-          <Text style={styles.subtext}>Sianok / Semangko</Text>
-        </View>
+          <View style={styles.cardFooterRow}>
+            <Text style={styles.subtext}>Sianok / Semangko</Text>
+            <View style={styles.navHintRow}>
+              <Navigation size={10} color={colors.brand.primary} />
+              <Text style={styles.navHintText}>Rute</Text>
+            </View>
+          </View>
+        </TouchableOpacity>
 
         {/* Galodo Marapi */}
-        <View style={styles.card}>
+        <TouchableOpacity
+          style={styles.card}
+          onPress={() => onSelectHazard && onSelectHazard('galodo')}
+          activeOpacity={0.75}
+        >
           <View style={styles.cardTop}>
             <View style={[styles.iconBox, { backgroundColor: 'rgba(244, 63, 94, 0.15)' }]}>
               <Mountain size={16} color={colors.category.galodo} />
@@ -119,11 +164,21 @@ export const DistanceGrid: React.FC<DistanceGridProps> = ({
           <Text style={[styles.distValue, { color: galodoStatus.color }]}>
             {findDist('galodo', 46.5)}
           </Text>
-          <Text style={styles.subtext}>Hulu Batang Anai</Text>
-        </View>
+          <View style={styles.cardFooterRow}>
+            <Text style={styles.subtext}>Hulu Batang Anai</Text>
+            <View style={styles.navHintRow}>
+              <Navigation size={10} color={colors.brand.primary} />
+              <Text style={styles.navHintText}>Rute</Text>
+            </View>
+          </View>
+        </TouchableOpacity>
 
         {/* Banjir DAS */}
-        <View style={styles.card}>
+        <TouchableOpacity
+          style={styles.card}
+          onPress={() => onSelectHazard && onSelectHazard('banjir')}
+          activeOpacity={0.75}
+        >
           <View style={styles.cardTop}>
             <View style={[styles.iconBox, { backgroundColor: 'rgba(56, 189, 248, 0.15)' }]}>
               <CloudRain size={16} color={colors.category.banjir} />
@@ -140,27 +195,91 @@ export const DistanceGrid: React.FC<DistanceGridProps> = ({
           <Text style={[styles.distValue, { color: banjirStatus.color }]}>
             {findDist('banjir', 5.5)}
           </Text>
-          <Text style={styles.subtext}>DAS Batang Kuranji</Text>
-        </View>
+          <View style={styles.cardFooterRow}>
+            <Text style={styles.subtext}>DAS Batang Kuranji</Text>
+            <View style={styles.navHintRow}>
+              <Navigation size={10} color={colors.brand.primary} />
+              <Text style={styles.navHintText}>Rute</Text>
+            </View>
+          </View>
+        </TouchableOpacity>
       </View>
 
-      {/* Shelter Banner (Metric ke-5) */}
-      <View style={styles.shelterMetric}>
-        <View style={styles.shelterLeft}>
-          <View style={styles.shelterIcon}>
-            <Home size={18} color="#c084fc" />
+      {/* Fasilitas Evakuasi Terdekat: Posko Pengungsi & Shelter TES */}
+      <View style={styles.facilitySection}>
+        {/* Metric Posko Pengungsian Terdekat */}
+        <TouchableOpacity
+          style={styles.poskoMetric}
+          onPress={() =>
+            onOpenRoute &&
+            onOpenRoute(
+              poskoTarget || {
+                nama: poskoName,
+                jenis: 'posko_utama',
+                bencana: 'gempa',
+              }
+            )
+          }
+          activeOpacity={0.8}
+        >
+          <View style={styles.shelterLeft}>
+            <View style={[styles.shelterIcon, { backgroundColor: 'rgba(249, 115, 22, 0.15)' }]}>
+              <Building2 size={16} color={colors.brand.primary} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.shelterLabel}>Posko Pengungsian Terdekat</Text>
+              <Text style={styles.shelterName} numberOfLines={1}>
+                {poskoName || 'Posko Komando BPBD'}
+              </Text>
+            </View>
           </View>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.shelterLabel}>Shelter Evakuasi Terdekat</Text>
-            <Text style={styles.shelterName} numberOfLines={1}>
-              {shelterName || 'TES Ulak Karang'}
+          <View style={styles.shelterRight}>
+            <Text style={[styles.shelterDist, { color: colors.brand.primary }]}>
+              {typeof nearestPoskoKm === 'number' ? nearestPoskoKm.toFixed(2) : nearestPoskoKm} KM
             </Text>
+            <View style={styles.actionPillBtn}>
+              <Navigation size={10} color="#ffffff" />
+              <Text style={styles.actionPillText}>Pandu Rute</Text>
+            </View>
           </View>
-        </View>
-        <View style={styles.shelterRight}>
-          <Text style={styles.shelterDist}>{nearestShelterKm} KM</Text>
-          <Text style={styles.shelterSafe}>Titik Aman</Text>
-        </View>
+        </TouchableOpacity>
+
+        {/* Metric Shelter TES Terdekat */}
+        <TouchableOpacity
+          style={styles.shelterMetric}
+          onPress={() =>
+            onOpenRoute &&
+            onOpenRoute(
+              shelterTarget || {
+                nama: shelterName,
+                jenis: 'shelter_tes_tea',
+                bencana: 'tsunami',
+              }
+            )
+          }
+          activeOpacity={0.8}
+        >
+          <View style={styles.shelterLeft}>
+            <View style={styles.shelterIcon}>
+              <Home size={16} color="#c084fc" />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.shelterLabel}>Shelter Vertikal TES Terdekat</Text>
+              <Text style={styles.shelterName} numberOfLines={1}>
+                {shelterName || 'TES Ulak Karang'}
+              </Text>
+            </View>
+          </View>
+          <View style={styles.shelterRight}>
+            <Text style={styles.shelterDist}>
+              {typeof nearestShelterKm === 'number' ? nearestShelterKm.toFixed(2) : nearestShelterKm} KM
+            </Text>
+            <View style={[styles.actionPillBtn, { backgroundColor: '#9333ea' }]}>
+              <Navigation size={10} color="#ffffff" />
+              <Text style={styles.actionPillText}>Pandu Rute</Text>
+            </View>
+          </View>
+        </TouchableOpacity>
       </View>
     </View>
   );
@@ -230,6 +349,20 @@ const styles = StyleSheet.create({
     color: colors.text.muted,
     marginTop: 2,
   },
+  facilitySection: {
+    marginTop: 8,
+    gap: 8,
+  },
+  poskoMetric: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: 'rgba(249, 115, 22, 0.08)',
+    borderRadius: 16,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(249, 115, 22, 0.25)',
+  },
   shelterMetric: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -237,7 +370,6 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(192, 132, 252, 0.1)',
     borderRadius: 16,
     padding: 12,
-    marginTop: 8,
     borderWidth: 1,
     borderColor: 'rgba(192, 132, 252, 0.25)',
   },
@@ -289,5 +421,40 @@ const styles = StyleSheet.create({
   miniStatusText: {
     fontSize: 8.5,
     fontWeight: '800',
+  },
+  cardFooterRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 2,
+  },
+  navHintRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+    backgroundColor: 'rgba(249, 115, 22, 0.12)',
+    paddingHorizontal: 5,
+    paddingVertical: 1.5,
+    borderRadius: 4,
+  },
+  navHintText: {
+    fontSize: 8.5,
+    fontWeight: '700',
+    color: colors.brand.primary,
+  },
+  actionPillBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    backgroundColor: colors.brand.primary,
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderRadius: 6,
+    marginTop: 3,
+  },
+  actionPillText: {
+    fontSize: 9,
+    fontWeight: '800',
+    color: '#ffffff',
   },
 });

@@ -76,12 +76,13 @@ async def list_bencana(
     jenis: Optional[str] = Query(None, description="Filter jenis bencana"),
     tahun: Optional[int] = Query(None, description="Filter tahun"),
     wilayah_id: Optional[int] = Query(None, description="Filter ID wilayah"),
+    status_verifikasi: Optional[str] = Query("terverifikasi", description="Filter status verifikasi (terverifikasi, menunggu, ditolak, atau semua)"),
     limit: int = Query(20, ge=1, le=100),
     offset: int = Query(0, ge=0),
     db: AsyncSession = Depends(get_async_db)
 ):
     """
-    Daftar kejadian bencana dengan filter jenis, tahun, dan wilayah.
+    Daftar kejadian bencana dengan filter jenis, tahun, status verifikasi, dan wilayah.
     """
     filters = ["1=1"]
     params: Dict[str, Any] = {"limit": limit, "offset": offset}
@@ -97,6 +98,10 @@ async def list_bencana(
     if wilayah_id:
         filters.append("k.wilayah_id = :wilayah_id")
         params["wilayah_id"] = wilayah_id
+
+    if status_verifikasi and status_verifikasi.lower() != "semua":
+        filters.append("LOWER(k.status_verifikasi) = LOWER(:status_verifikasi)")
+        params["status_verifikasi"] = status_verifikasi
 
     where_clause = " AND ".join(filters)
 
@@ -151,24 +156,36 @@ async def list_bencana(
 async def riwayat_bencana(
     jenis: Optional[str] = Query(None),
     tahun: Optional[int] = Query(None),
+    status_verifikasi: Optional[str] = Query("terverifikasi"),
     limit: int = Query(10, ge=1, le=50),
     db: AsyncSession = Depends(get_async_db)
 ):
     """
     Alias timeline riwayat bencana terbaru untuk feed informasi.
     """
-    return await list_bencana(jenis=jenis, tahun=tahun, wilayah_id=None, limit=limit, offset=0, db=db)
+    return await list_bencana(jenis=jenis, tahun=tahun, wilayah_id=None, status_verifikasi=status_verifikasi, limit=limit, offset=0, db=db)
 
 @router.get("/statistik")
 async def statistik_bencana(
     tahun: Optional[int] = Query(None, description="Filter tahun statistik"),
+    status_verifikasi: Optional[str] = Query("terverifikasi", description="Filter status verifikasi"),
     db: AsyncSession = Depends(get_async_db)
 ):
     """
     Ringkasan metrik statistik bencana tingkat provinsi Sumatera Barat.
     """
-    year_filter = "WHERE EXTRACT(YEAR FROM k.tanggal_kejadian) = :tahun" if tahun else ""
-    params = {"tahun": tahun} if tahun else {}
+    filters = []
+    params = {}
+    
+    if tahun:
+        filters.append("EXTRACT(YEAR FROM k.tanggal_kejadian) = :tahun")
+        params["tahun"] = tahun
+        
+    if status_verifikasi and status_verifikasi.lower() != "semua":
+        filters.append("LOWER(k.status_verifikasi) = LOWER(:status_verifikasi)")
+        params["status_verifikasi"] = status_verifikasi
+        
+    where_clause = f"WHERE {' AND '.join(filters)}" if filters else ""
 
     sql_ringkasan = text(f"""
         SELECT 
@@ -193,7 +210,7 @@ async def statistik_bencana(
             COALESCE(SUM(d.kerugian_rp), 0) AS kerugian
         FROM kejadian_bencana k
         LEFT JOIN data_dampak_bencana d ON d.kejadian_id = k.id
-        {year_filter}
+        {where_clause}
         GROUP BY k.jenis_bencana
         ORDER BY jumlah DESC;
     """)
@@ -223,6 +240,7 @@ async def statistik_bencana(
 async def heatmap_bencana(
     jenis: Optional[str] = Query(None),
     tahun: Optional[int] = Query(None),
+    status_verifikasi: Optional[str] = Query("terverifikasi", description="Filter status verifikasi"),
     db: AsyncSession = Depends(get_async_db)
 ):
     """
@@ -238,6 +256,10 @@ async def heatmap_bencana(
     if tahun:
         filters.append("EXTRACT(YEAR FROM k.tanggal_kejadian) = :tahun")
         params["tahun"] = tahun
+
+    if status_verifikasi and status_verifikasi.lower() != "semua":
+        filters.append("LOWER(k.status_verifikasi) = LOWER(:status_verifikasi)")
+        params["status_verifikasi"] = status_verifikasi
 
     where_clause = " AND ".join(filters)
 
@@ -352,6 +374,27 @@ async def detail_bencana(
 # ENDPOINTS MUTASI (CREATE, UPDATE, VERIFIKASI, DELETE)
 # ============================================================================
 
+def normalize_jenis_bencana(raw_jenis: str) -> str:
+    cleaned = (raw_jenis or "").lower().strip()
+    if 'banjir' in cleaned or 'genangan' in cleaned:
+        return 'banjir'
+    if 'galodo' in cleaned or 'longsor' in cleaned or 'tanah longsor' in cleaned or 'blokade' in cleaned:
+        return 'longsor'
+    if 'gempa' in cleaned:
+        return 'gempa'
+    if 'tsunami' in cleaned:
+        return 'tsunami'
+    if 'erupsi' in cleaned or 'gunung' in cleaned or 'lahar' in cleaned:
+        return 'erupsi'
+    if 'angin' in cleaned or 'puting' in cleaned or 'pohon' in cleaned or 'badai' in cleaned:
+        return 'angin_puting_beliung'
+    if 'kebakaran' in cleaned or 'api' in cleaned:
+        return 'kebakaran'
+    valid_list = ['gempa', 'tsunami', 'banjir', 'longsor', 'erupsi', 'angin_puting_beliung', 'kebakaran', 'lainnya']
+    if cleaned in valid_list:
+        return cleaned
+    return 'lainnya'
+
 @router.post("/lapor", status_code=status.HTTP_201_CREATED)
 @router.post("/lapor-warga", status_code=status.HTTP_201_CREATED)
 async def lapor_bencana_warga(
@@ -360,19 +403,14 @@ async def lapor_bencana_warga(
     db: AsyncSession = Depends(get_async_db)
 ):
     """
-    Endpoint Partisipatif Publik (Crowdsourcing Warga):
+    Endpoint Partisipatif Publik (Crowdsourcing Warga & Mobile App):
     Melaporkan kondisi darurat bencana langsung dari ponsel warga.
-    Laporan otomatis masuk antrean verifikasi supervisor Pusdalops.
+    Laporan otomatis masuk antrean verifikasi supervisor Pusdalops BPBD.
     """
-    valid_jenis = ['gempa', 'tsunami', 'banjir', 'longsor', 'erupsi', 'angin_puting_beliung', 'kebakaran', 'lainnya']
-    if payload.jenis_bencana not in valid_jenis:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail={"error": {"code": "INVALID_JENIS", "message": f"Jenis bencana harus salah satu dari: {', '.join(valid_jenis)}"}}
-        )
+    jenis_normalized = normalize_jenis_bencana(payload.jenis_bencana)
 
-    # Validasi Bounding Box Spasial Sumatera Barat (Lat: -3.5 s/d 0.9, Lon: 98.5 s/d 101.9)
-    if not (-3.5 <= payload.lat <= 0.9 and 98.5 <= payload.lon <= 101.9):
+    # Validasi Bounding Box Spasial Sumatera Barat (Lat: -4.5 s/d 1.5, Lon: 96.0 s/d 103.0)
+    if not (-4.5 <= payload.lat <= 1.5 and 96.0 <= payload.lon <= 103.0):
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail={"error": {"code": "OUT_OF_BOUNDS", "message": "Koordinat lokasi pelaporan berada di luar batas wilayah Provinsi Sumatera Barat."}}
@@ -388,7 +426,7 @@ async def lapor_bencana_warga(
     wilayah_id = wilayah_row.id if wilayah_row else None
     wilayah_nama = wilayah_row.nama if wilayah_row else "Sumatera Barat"
 
-    clean_pelapor = payload.nama_pelapor.strip() if payload.nama_pelapor else "Warga Lapangan"
+    clean_pelapor = payload.nama_pelapor.strip() if payload.nama_pelapor else "Warga Mobile Lapangan"
     clean_kontak = payload.kontak_pelapor.strip() if payload.kontak_pelapor else "Tanpa Nomor Kontak"
     laporan_deskripsi = f"[Laporan Warga: {clean_pelapor} | Kontak: {clean_kontak}] {payload.deskripsi}"
 
@@ -406,7 +444,7 @@ async def lapor_bencana_warga(
     """)
 
     res = await db.execute(sql_kejadian, {
-        "jenis": payload.jenis_bencana,
+        "jenis": jenis_normalized,
         "wilayah_id": wilayah_id,
         "lon": payload.lon,
         "lat": payload.lat,
@@ -423,7 +461,7 @@ async def lapor_bencana_warga(
         aksi="LAPOR_WARGA_CROWDSOURCE",
         tabel_target="kejadian_bencana",
         record_id=row.id,
-        detail={"jenis": payload.jenis_bencana, "pelapor": clean_pelapor, "lat": payload.lat, "lon": payload.lon, "foto_terlampir": bool(foto_url)},
+        detail={"jenis": jenis_normalized, "pelapor": clean_pelapor, "lat": payload.lat, "lon": payload.lon, "foto_terlampir": bool(foto_url)},
         ip_address=client_ip
     )
 
@@ -433,7 +471,7 @@ async def lapor_bencana_warga(
     await broadcaster.broadcast("laporan_baru", {
         "id": row.id,
         "ticket_id": f"LAPOR-SUMBAR-{row.id}",
-        "jenis_bencana": payload.jenis_bencana,
+        "jenis_bencana": jenis_normalized,
         "wilayah": wilayah_nama,
         "lat": payload.lat,
         "lon": payload.lon,
@@ -446,11 +484,52 @@ async def lapor_bencana_warga(
     return {
         "status": "success",
         "ticket_id": f"LAPOR-SUMBAR-{row.id}",
+        "id": row.id,
         "bencana_id": row.id,
         "foto_url": row.foto_url,
+        "status_verifikasi": "menunggu",
         "message": "Terima kasih atas kepedulian Anda. Laporan situasi dan bukti foto telah diterima Pusdalops BPBD Sumbar dan segera diverifikasi petugas.",
         "wilayah_terdeteksi": wilayah_nama,
         "estimasi_tindakan": "Petugas TRC terdekat segera mengonfirmasi titik koordinat."
+    }
+
+@router.get("/laporan/status/{bencana_id}")
+async def get_status_laporan_warga(
+    bencana_id: int,
+    db: AsyncSession = Depends(get_async_db)
+):
+    """
+    Cek status verifikasi laporan warga (menunggu, terverifikasi, ditolak).
+    """
+    query = text("""
+        SELECT 
+            k.id, k.jenis_bencana, k.tanggal_kejadian, k.deskripsi, k.status_verifikasi,
+            k.foto_url, k.sumber_data, w.nama AS wilayah_nama,
+            COALESCE(ST_X(k.lokasi), 0) AS lon, COALESCE(ST_Y(k.lokasi), 0) AS lat
+        FROM kejadian_bencana k
+        LEFT JOIN wilayah_administratif w ON w.id = k.wilayah_id
+        WHERE k.id = :id;
+    """)
+    res = await db.execute(query, {"id": bencana_id})
+    row = res.fetchone()
+    if not row:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={"error": {"code": "NOT_FOUND", "message": f"Laporan ID #{bencana_id} tidak ditemukan."}}
+        )
+    return {
+        "status": "success",
+        "id": row.id,
+        "ticket_id": f"LAPOR-SUMBAR-{row.id}",
+        "jenis_bencana": row.jenis_bencana,
+        "wilayah": row.wilayah_nama or "Sumatera Barat",
+        "status_verifikasi": row.status_verifikasi,
+        "sumber_data": row.sumber_data,
+        "foto_url": row.foto_url,
+        "deskripsi": row.deskripsi,
+        "lat": float(row.lat) if row.lat != 0 else None,
+        "lon": float(row.lon) if row.lon != 0 else None,
+        "tanggal": row.tanggal_kejadian.isoformat() if row.tanggal_kejadian else None,
     }
 
 @router.post("", status_code=status.HTTP_201_CREATED)
@@ -810,11 +889,11 @@ async def verifikasi_bencana(
     bencana_id: int,
     payload: BencanaVerifikasiRequest,
     request: Request,
-    current_user: Pengguna = Depends(require_role(["admin", "pimpinan"])),
+    current_user: Pengguna = Depends(require_role(["admin", "pimpinan", "pusdalops", "super_admin"])),
     db: AsyncSession = Depends(get_async_db)
 ):
     """
-    Admin Pusdalops & Pimpinan: Memverifikasi laporan kejadian bencana agar tayang di peta publik.
+    Admin, Pusdalops BPBD & Pimpinan: Memverifikasi laporan kejadian bencana agar tayang di peta publik.
     """
     valid_status = ['terverifikasi', 'menunggu', 'ditolak']
     if payload.status_verifikasi not in valid_status:

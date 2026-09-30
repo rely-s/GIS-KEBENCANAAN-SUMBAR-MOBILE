@@ -10,11 +10,15 @@ from app.services.routing_service import kalkulasi_evakuasi_darurat, get_nearest
 router = APIRouter(prefix="", tags=["Routing Evakuasi & Posko"])
 
 class EvakuasiRequest(BaseModel):
-    lat: Optional[float] = Field(default=None, ge=-10.0, le=10.0, description="Lintang titik pengguna")
-    lon: Optional[float] = Field(default=None, ge=90.0, le=145.0, description="Bujur titik pengguna")
+    lat: Optional[float] = Field(default=None, ge=-90.0, le=90.0, description="Lintang titik pengguna")
+    lon: Optional[float] = Field(default=None, ge=-180.0, le=180.0, description="Bujur titik pengguna")
     kecamatan_id: Optional[Union[int, str]] = Field(default=None, description="ID atau kode kecamatan hasil cascading combobox")
     jenis_bencana: Optional[str] = Field(default="gempa", description="tsunami | gempa | galodo | banjir | longsor | erupsi")
     moda: Optional[str] = Field(default="mobil", description="Moda transportasi: mobil | motor | jalan_kaki")
+    dest_lat: Optional[float] = Field(default=None, ge=-90.0, le=90.0, description="Lintang titik tujuan spesifik (opsional)")
+    dest_lon: Optional[float] = Field(default=None, ge=-180.0, le=180.0, description="Bujur titik tujuan spesifik (opsional)")
+    dest_nama: Optional[str] = Field(default=None, description="Nama titik tujuan spesifik (opsional)")
+    posko_id: Optional[int] = Field(default=None, description="ID posko tujuan spesifik (opsional)")
 
 class InstruksiLangkah(BaseModel):
     teks: str
@@ -52,6 +56,8 @@ class EvakuasiResponse(BaseModel):
     jenis_bencana: str
     posko: PoskoInfo
     jarak_km: float
+    jarak_lurus_km: Optional[float] = None
+    routing_engine: Optional[str] = "osrm"
     estimasi_menit: int
     geometry: Dict[str, Any]
     instruksi: List[InstruksiLangkah]
@@ -83,7 +89,11 @@ async def evakuasi_darurat(
             lon=payload.lon,
             kecamatan_id=payload.kecamatan_id,
             jenis_bencana=payload.jenis_bencana or "gempa",
-            moda=payload.moda or "mobil"
+            moda=payload.moda or "mobil",
+            dest_lat=payload.dest_lat,
+            dest_lon=payload.dest_lon,
+            dest_nama=payload.dest_nama,
+            posko_id=payload.posko_id
         )
         return hasil
     except ValueError as e:

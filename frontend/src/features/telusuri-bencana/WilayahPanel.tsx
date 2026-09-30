@@ -78,7 +78,7 @@ interface WilayahPanelProps {
   loading: boolean;
   onClose: () => void;
   onFocusRegion?: () => void;
-  onStartEvakuasiRoute?: (posko: { lat: number; lng: number; nama: string }) => void;
+  onStartEvakuasiRoute?: (posko: { lat: number; lng: number; nama: string; id?: number }) => void;
 }
 
 export const WilayahPanel: React.FC<WilayahPanelProps> = ({

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   SafeAreaView,
   StatusBar,
@@ -23,17 +23,18 @@ import {
   PhoneCall,
 } from 'lucide-react-native';
 
+import * as WebBrowser from 'expo-web-browser';
 import { colors } from './src/theme/colors';
 import { Header } from './src/components/Header';
 import { HeroStatus } from './src/components/HeroStatus';
-import { DistanceGrid } from './src/components/DistanceGrid';
-import { ShelterSection } from './src/components/ShelterSection';
+import { DistanceGrid, type FacilityRouteTarget } from './src/components/DistanceGrid';
+import { ShelterSection, type ShelterRouteParams } from './src/components/ShelterSection';
 import { WebMapHandoff } from './src/components/WebMapHandoff';
 import { ReportModal } from './src/components/ReportModal';
 import { SosModal } from './src/components/SosModal';
 import { Toast } from './src/components/Toast';
 
-import { fetchProximityCheck, fetchShelters } from './src/api/client';
+import { fetchProximityCheck, fetchShelters, calculateLocalHaversineKm } from './src/api/client';
 import { ProximityCheckResponse, PoskoResponse, LaporanRecord } from './src/types';
 
 export default function App() {
@@ -92,23 +93,42 @@ export default function App() {
         const loc = await Location.getCurrentPositionAsync({
           accuracy: Location.Accuracy.Balanced,
         });
-        currentLat = loc.coords.latitude;
-        currentLon = loc.coords.longitude;
+        const rawLat = loc.coords.latitude;
+        const rawLon = loc.coords.longitude;
+        const isWithinSumbar = rawLat >= -4.5 && rawLat <= 1.5 && rawLon >= 96.0 && rawLon <= 103.0;
+
+        if (isWithinSumbar) {
+          currentLat = rawLat;
+          currentLon = rawLon;
+          setUserLat(currentLat);
+          setUserLon(currentLon);
+
+          // Reverse Geocode
+          try {
+            const rev = await Location.reverseGeocodeAsync({
+              latitude: currentLat,
+              longitude: currentLon,
+            });
+            if (rev && rev.length > 0) {
+              const r = rev[0];
+              const name = [r.district, r.city || r.subregion].filter(Boolean).join(', ');
+              if (name) setLocationLabel(name);
+            }
+          } catch (_) {}
+        } else {
+          currentLat = -0.9471;
+          currentLon = 100.3543;
+          setUserLat(currentLat);
+          setUserLon(currentLon);
+          setLocationLabel('Padang Barat, Kota Padang');
+          showToast('Kalibrasi Wilayah', 'Lokasi GPS disesuaikan ke Padang Barat untuk analisis kebencanaan Sumbar.');
+        }
+      } else {
+        currentLat = -0.9471;
+        currentLon = 100.3543;
         setUserLat(currentLat);
         setUserLon(currentLon);
-
-        // Reverse Geocode
-        try {
-          const rev = await Location.reverseGeocodeAsync({
-            latitude: currentLat,
-            longitude: currentLon,
-          });
-          if (rev && rev.length > 0) {
-            const r = rev[0];
-            const name = [r.district, r.city || r.subregion].filter(Boolean).join(', ');
-            if (name) setLocationLabel(name);
-          }
-        } catch (_) {}
+        setLocationLabel('Padang Barat, Kota Padang');
       }
 
       // Fetch Proximity & Shelters
@@ -135,6 +155,91 @@ export default function App() {
   const handleReportCreated = (newReport: LaporanRecord) => {
     setMyReports((prev) => [newReport, ...prev]);
   };
+
+  // Handoff Pandu Rute Evakuasi ke Web GIS
+  const handleOpenWebEvacuationRoute = async (target?: ShelterRouteParams | (FacilityRouteTarget & { bencana?: string })) => {
+    try {
+      const webBaseUrl = 'http://127.0.0.1:5173';
+      const bencanaType = target?.bencana || 'tsunami';
+      let url = `${webBaseUrl}/?view=mobile_lite&action=evakuasi&userLat=${userLat}&userLon=${userLon}&zoom=16&layer=poskoEvakuasi,jalanTerputus,zonaTsunami,shelterTes`;
+      
+      if (target?.lat && target?.lon) {
+        url += `&destLat=${target.lat}&destLon=${target.lon}`;
+      }
+      if (target?.nama) {
+        url += `&destNama=${encodeURIComponent(target.nama)}`;
+      }
+      const targetPoskoId = (target as any)?.poskoId || (target as any)?.id;
+      if (targetPoskoId) {
+        url += `&poskoId=${targetPoskoId}`;
+      }
+      url += `&bencana=${encodeURIComponent(bencanaType)}`;
+
+      showToast('Membuka Web GIS', `Mengarahkan rute evakuasi ke ${target?.nama || 'Titik Evakuasi'}...`);
+
+      if (Platform.OS === 'web') {
+        window.open(url, '_blank');
+      } else {
+        await WebBrowser.openBrowserAsync(url, {
+          presentationStyle: WebBrowser.WebBrowserPresentationStyle.PAGE_SHEET,
+          toolbarColor: colors.surface.card,
+          controlsColor: colors.brand.primary,
+        });
+      }
+    } catch (err) {
+      console.warn('Gagal membuka rute Web GIS:', err);
+    }
+  };
+
+  // Posko dan Shelter Terdekat dari dataset
+  const nearestTesFeature = useMemo(() => {
+    return (
+      shelterData?.features?.find(
+        (f) =>
+          f.properties.jenis === 'shelter_tes_tea' ||
+          f.properties.jenis === 'shelter_sementara' ||
+          f.properties.nama?.toLowerCase().includes('tes') ||
+          f.properties.nama?.toLowerCase().includes('shelter')
+      ) || shelterData?.features?.[0]
+    );
+  }, [shelterData]);
+
+  const nearestPoskoFeature = useMemo(() => {
+    return (
+      shelterData?.features?.find(
+        (f) =>
+          f.properties.jenis === 'posko_utama' ||
+          f.properties.jenis === 'posko_pengungsi' ||
+          f.properties.nama?.toLowerCase().includes('bpbd') ||
+          f.properties.nama?.toLowerCase().includes('posko') ||
+          f.properties.nama?.toLowerCase().includes('camat')
+      ) || shelterData?.features?.[1]
+    );
+  }, [shelterData]);
+
+  const nearestTesDistKm = useMemo(() => {
+    if (nearestTesFeature?.geometry?.coordinates) {
+      return calculateLocalHaversineKm(
+        userLat,
+        userLon,
+        nearestTesFeature.geometry.coordinates[1],
+        nearestTesFeature.geometry.coordinates[0]
+      );
+    }
+    return 0.8;
+  }, [nearestTesFeature, userLat, userLon]);
+
+  const nearestPoskoDistKm = useMemo(() => {
+    if (nearestPoskoFeature?.geometry?.coordinates) {
+      return calculateLocalHaversineKm(
+        userLat,
+        userLon,
+        nearestPoskoFeature.geometry.coordinates[1],
+        nearestPoskoFeature.geometry.coordinates[0]
+      );
+    }
+    return 1.25;
+  }, [nearestPoskoFeature, userLat, userLon]);
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -177,19 +282,64 @@ export default function App() {
                 directive={proximityData?.primary_threat.actionable_directive || ''}
               />
 
-              {/* 5-Metrics Grid Jarak Spasial */}
+              {/* Grid Jarak Spasial Multi-Bahaya & Fasilitas Posko */}
               <DistanceGrid
                 threats={proximityData?.all_threats || []}
-                nearestShelterKm={0.8}
-                shelterName="TES Ulak Karang Padang Utara"
+                nearestShelterKm={nearestTesDistKm}
+                shelterName={nearestTesFeature?.properties?.nama || 'TES Ulak Karang'}
+                shelterTarget={
+                  nearestTesFeature
+                    ? {
+                        id: nearestTesFeature.properties.id,
+                        nama: nearestTesFeature.properties.nama,
+                        lat: nearestTesFeature.geometry.coordinates[1],
+                        lon: nearestTesFeature.geometry.coordinates[0],
+                        jenis: nearestTesFeature.properties.jenis || 'shelter_tes_tea',
+                        bencana: 'tsunami',
+                      }
+                    : undefined
+                }
+                nearestPoskoKm={nearestPoskoDistKm}
+                poskoName={nearestPoskoFeature?.properties?.nama || 'Posko Komando BPBD'}
+                poskoTarget={
+                  nearestPoskoFeature
+                    ? {
+                        id: nearestPoskoFeature.properties.id,
+                        nama: nearestPoskoFeature.properties.nama,
+                        lat: nearestPoskoFeature.geometry.coordinates[1],
+                        lon: nearestPoskoFeature.geometry.coordinates[0],
+                        jenis: nearestPoskoFeature.properties.jenis || 'posko_utama',
+                        bencana: 'gempa',
+                      }
+                    : undefined
+                }
+                onOpenRoute={handleOpenWebEvacuationRoute}
+                onSelectHazard={(hazardType) => {
+                  let destNama = 'Titik Evakuasi Teraman';
+                  let targetJenis = 'shelter_tes_tea';
+                  let targetFeature = nearestTesFeature;
+                  if (hazardType === 'gempa' || hazardType === 'galodo' || hazardType === 'banjir') {
+                    destNama = nearestPoskoFeature?.properties.nama || 'Posko Evakuasi Terdekat';
+                    targetJenis = 'posko_utama';
+                    targetFeature = nearestPoskoFeature;
+                  }
+                  handleOpenWebEvacuationRoute({
+                    id: targetFeature?.properties.id,
+                    nama: targetFeature?.properties.nama || destNama,
+                    lat: targetFeature?.geometry.coordinates[1],
+                    lon: targetFeature?.geometry.coordinates[0],
+                    jenis: targetJenis,
+                    bencana: hazardType,
+                  });
+                }}
               />
 
               {/* Shelter & Posko Medis */}
               <ShelterSection
                 shelters={shelterData?.features || []}
-                onOpenWebRoute={() => {
-                  showToast('Peta Rute Evakuasi', 'Membuka panduan navigasi evakuasi di Web GIS.');
-                }}
+                userLat={userLat}
+                userLon={userLon}
+                onOpenWebRoute={handleOpenWebEvacuationRoute}
               />
 
               {/* Web GIS Seamless Handoff */}
@@ -445,7 +595,7 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     paddingHorizontal: 16,
-    paddingBottom: 90,
+    paddingBottom: 120,
   },
   tabContent: {
     paddingTop: 4,

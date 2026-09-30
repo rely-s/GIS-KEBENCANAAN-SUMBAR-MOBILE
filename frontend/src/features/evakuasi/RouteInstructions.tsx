@@ -61,6 +61,8 @@ export interface EvakuasiRouteData {
     lon: number;
   };
   jarak_km: number;
+  jarak_lurus_km?: number;
+  routing_engine?: string;
   estimasi_menit: number;
   geometry: any;
   instruksi: RouteInstructionItem[];
@@ -329,22 +331,30 @@ export const RouteInstructions: React.FC<RouteInstructionsProps> = ({
 
       {/* Ringkasan Jarak & Waktu Tempuh */}
       <div className="grid grid-cols-2 gap-2 p-3 bg-[#131E2A] border-b border-[#243444]/60 text-center">
-        <div className="flex items-center justify-center gap-2 py-1 bg-[#1B2733]/70 rounded-lg border border-[#2B3C4E]/50">
-          <Clock className="w-4 h-4 text-cyan-400" />
+        <div className="flex items-center justify-center gap-2 py-1.5 bg-[#1B2733]/70 rounded-lg border border-[#2B3C4E]/50">
+          <Clock className="w-4 h-4 text-cyan-400 shrink-0" />
           <div>
             <div className="text-[10px] text-slate-400 uppercase font-mono">Estimasi Waktu</div>
             <div className="text-sm font-bold text-white font-display">
               ~{routeData.estimasi_menit} Menit
             </div>
+            <div className="text-[9px] text-slate-400">
+              {currentModa === 'jalan_kaki' ? '🏃 Kecepatan Evakuasi Kaki' : '🚗 Rute Berkendara'}
+            </div>
           </div>
         </div>
-        <div className="flex items-center justify-center gap-2 py-1 bg-[#1B2733]/70 rounded-lg border border-[#2B3C4E]/50">
-          <MapPin className="w-4 h-4 text-emerald-400" />
+        <div className="flex items-center justify-center gap-2 py-1.5 bg-[#1B2733]/70 rounded-lg border border-[#2B3C4E]/50">
+          <MapPin className="w-4 h-4 text-emerald-400 shrink-0" />
           <div>
-            <div className="text-[10px] text-slate-400 uppercase font-mono">Total Jarak</div>
-            <div className="text-sm font-bold text-white font-display">
+            <div className="text-[10px] text-slate-400 uppercase font-mono">Jarak Rute Jalan</div>
+            <div className="text-sm font-bold text-emerald-300 font-display">
               {routeData.jarak_km} km
             </div>
+            {routeData.jarak_lurus_km !== undefined && (
+              <div className="text-[9px] text-slate-400 font-mono">
+                Garis Lurus: {routeData.jarak_lurus_km} km
+              </div>
+            )}
           </div>
         </div>
       </div>

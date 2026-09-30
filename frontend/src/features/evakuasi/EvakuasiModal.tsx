@@ -18,6 +18,12 @@ import {
 } from 'lucide-react';
 import { DisasterChatbot } from '../bot/DisasterChatbot';
 
+import { 
+  normalizeCoordinates, 
+  isWithinSumbar, 
+  DEFAULT_SUMBAR_COORDS 
+} from '../../utils/geoUtils';
+
 export type MultiHazardType = 'tsunami' | 'galodo' | 'sesar' | 'erupsi';
 
 export interface EvakuasiStartParams {
@@ -27,6 +33,10 @@ export interface EvakuasiStartParams {
   lat?: number;
   lon?: number;
   moda: 'mobil' | 'jalan_kaki';
+  dest_lat?: number;
+  dest_lon?: number;
+  dest_nama?: string;
+  posko_id?: number;
 }
 
 interface EvakuasiModalProps {
@@ -35,10 +45,10 @@ interface EvakuasiModalProps {
   onStartEvakuasi: (params: EvakuasiStartParams) => void;
   loading: boolean;
   defaultJenisBencana?: string;
-  userCoords?: { lat: number; lng: number } | null;
+  userCoords?: { lat: number; lng: number; accuracy?: number } | null;
   onPickLocationOnMap?: () => void;
   onFlyToLocation?: (coords: { lat: number; lng: number; zoom?: number }) => void;
-  onSelectDestination?: (loc: { lat: number; lng: number; nama: string }) => void;
+  onSelectDestination?: (loc: { lat: number; lng: number; nama: string; id?: number }) => void;
 }
 
 interface HazardProtocolMeta {
@@ -138,6 +148,7 @@ export const EvakuasiModal: React.FC<EvakuasiModalProps> = ({
   // 2. Lokasi Pengguna
   const [useGps, setUseGps] = useState<boolean>(false);
   const [gpsLoading, setGpsLoading] = useState<boolean>(false);
+  const [gpsAccuracy, setGpsAccuracy] = useState<number | null>(userCoords?.accuracy ?? null);
   const [detectedWilayahNama, setDetectedWilayahNama] = useState<string | null>(null);
   const [activeCoords, setActiveCoords] = useState<{ lat: number; lon: number } | null>(
     userCoords ? { lat: userCoords.lat, lon: userCoords.lng } : null
@@ -150,6 +161,9 @@ export const EvakuasiModal: React.FC<EvakuasiModalProps> = ({
   useEffect(() => {
     if (userCoords) {
       setActiveCoords({ lat: userCoords.lat, lon: userCoords.lng });
+      if (userCoords.accuracy !== undefined) {
+        setGpsAccuracy(userCoords.accuracy);
+      }
     }
   }, [userCoords]);
 
@@ -174,26 +188,49 @@ export const EvakuasiModal: React.FC<EvakuasiModalProps> = ({
     }
   }, [isOpen]);
 
-  // Handler Deteksi GPS Otomatis
+  // Handler Deteksi GPS Otomatis Presisi Tinggi
   const handleUseGps = () => {
     if (!navigator.geolocation) {
-      alert('Peramban tidak mendukung Geolocation API');
+      alert('Peramban tidak mendukung Geolocation API. Menggunakan titik default Padang Barat.');
+      setActiveCoords({ lat: DEFAULT_SUMBAR_COORDS.lat, lon: DEFAULT_SUMBAR_COORDS.lng });
+      setDetectedWilayahNama(DEFAULT_SUMBAR_COORDS.nama);
+      setUseGps(true);
       return;
     }
     setGpsLoading(true);
     navigator.geolocation.getCurrentPosition(
       async (pos) => {
-        const lat = pos.coords.latitude;
-        const lon = pos.coords.longitude;
+        const rawLat = pos.coords.latitude;
+        const rawLon = pos.coords.longitude;
+        const accuracy = Math.round(pos.coords.accuracy);
+        setGpsAccuracy(accuracy);
+
+        // Normalisasi & Deteksi otomatis koordinat tertukar
+        const normalized = normalizeCoordinates(rawLat, rawLon);
+        const validLat = normalized ? normalized.lat : rawLat;
+        const validLon = normalized ? normalized.lng : rawLon;
+        
+        // Cek apakah koordinat berada di dalam cakupan provinsi Sumatera Barat
+        const isSumbar = isWithinSumbar(validLat, validLon);
+        const lat = isSumbar ? validLat : DEFAULT_SUMBAR_COORDS.lat;
+        const lon = isSumbar ? validLon : DEFAULT_SUMBAR_COORDS.lng;
+
         setActiveCoords({ lat, lon });
         setUseGps(true);
+
+        if (!isSumbar) {
+          setDetectedWilayahNama('Padang Barat, Kota Padang (Simulasi Wilayah Sumbar)');
+          alert(`Lokasi GPS perangkat Anda terdeteksi di luar Sumatera Barat (${rawLat.toFixed(4)}, ${rawLon.toFixed(4)}). Sistem otomatis menyesuaikan titik awal ke Padang Barat agar simulasi evakuasi kebencanaan Sumbar berjalan akurat.`);
+        } else {
+          setDetectedWilayahNama(`Titik GPS Pengguna (${lat.toFixed(5)}, ${lon.toFixed(5)}) • Akurasi ±${accuracy}m`);
+        }
 
         try {
           const res = await fetch(`/api/wilayah/lookup?lat=${lat}&lon=${lon}`);
           if (res.ok) {
             const lookup = await res.json();
             if (lookup && lookup.nama) {
-              setDetectedWilayahNama(`Kecamatan ${lookup.nama}${lookup.parent_nama ? `, ${lookup.parent_nama}` : ''}`);
+              setDetectedWilayahNama(`Kecamatan ${lookup.nama}${lookup.parent_nama ? `, ${lookup.parent_nama}` : ''} (±${accuracy}m)`);
             }
           }
         } catch (e) {
@@ -204,9 +241,15 @@ export const EvakuasiModal: React.FC<EvakuasiModalProps> = ({
       },
       (err) => {
         setGpsLoading(false);
-        alert(`Gagal mendeteksi lokasi GPS: ${err.message}. Sistem akan menggunakan titik koordinat peta.`);
+        console.warn('GPS Error / Izin Ditolak:', err.message);
+        // Fallback cerdas: Gunakan titik pusat Padang Barat
+        setActiveCoords({ lat: DEFAULT_SUMBAR_COORDS.lat, lon: DEFAULT_SUMBAR_COORDS.lng });
+        setDetectedWilayahNama('Padang Barat, Kota Padang (Titik Siaga Acuan)');
+        setGpsAccuracy(null);
+        setUseGps(true);
+        alert(`Izin GPS perangkat tidak aktif/ditolak. Sistem otomatis menggunakan titik acuan Padang Barat (-0.9471, 100.3543). Anda juga dapat menggunakan opsi 'Pilih Titik di Peta'.`);
       },
-      { timeout: 8000, enableHighAccuracy: true }
+      { timeout: 10000, enableHighAccuracy: true, maximumAge: 0 }
     );
   };
 
@@ -419,14 +462,17 @@ export const EvakuasiModal: React.FC<EvakuasiModalProps> = ({
               )}
             </div>
 
-            {/* Status Indikator Lokasi */}
+            {/* Status Indikator Lokasi & Akurasi GPS */}
             <div className="p-2.5 rounded-lg bg-[#141F2B] border border-[#233547] text-[11px] text-slate-300 flex items-start gap-2">
               <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
               <div>
                 {detectedWilayahNama ? (
                   <span>Lokasi terdeteksi: <strong className="text-white">{detectedWilayahNama}</strong></span>
                 ) : activeCoords ? (
-                  <span>Titik koordinat aktif: <strong className="font-mono text-white">{activeCoords.lat.toFixed(4)}, {activeCoords.lon.toFixed(4)}</strong></span>
+                  <span>
+                    Titik koordinat aktif: <strong className="font-mono text-white">{activeCoords.lat.toFixed(5)}, {activeCoords.lon.toFixed(5)}</strong>
+                    {gpsAccuracy !== null && <span className="ml-1 text-emerald-400 font-mono">(Akurasi: ±{gpsAccuracy}m)</span>}
+                  </span>
                 ) : (
                   <span>Lokasi default simulasi: <strong className="text-white">Pesisir Padang Barat</strong> (Tekan tombol GPS atau Peta untuk mengubah)</span>
                 )}
