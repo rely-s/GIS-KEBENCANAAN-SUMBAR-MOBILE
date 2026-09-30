@@ -326,24 +326,6 @@ function MainApp() {
                     : undefined
                 }
                 onOpenRoute={handleOpenWebEvacuationRoute}
-                onSelectHazard={(hazardType) => {
-                  let destNama = 'Titik Evakuasi Teraman';
-                  let targetJenis = 'shelter_tes_tea';
-                  let targetFeature = nearestTesFeature;
-                  if (hazardType === 'gempa' || hazardType === 'galodo' || hazardType === 'banjir') {
-                    destNama = nearestPoskoFeature?.properties.nama || 'Posko Evakuasi Terdekat';
-                    targetJenis = 'posko_utama';
-                    targetFeature = nearestPoskoFeature;
-                  }
-                  handleOpenWebEvacuationRoute({
-                    id: targetFeature?.properties.id,
-                    nama: targetFeature?.properties.nama || destNama,
-                    lat: targetFeature?.geometry.coordinates[1],
-                    lon: targetFeature?.geometry.coordinates[0],
-                    jenis: targetJenis,
-                    bencana: hazardType,
-                  });
-                }}
               />
 
               {/* Web GIS Seamless Handoff */}

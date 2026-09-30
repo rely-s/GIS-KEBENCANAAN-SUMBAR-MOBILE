@@ -81,11 +81,7 @@ export const DistanceGrid: React.FC<DistanceGridProps> = ({
       {/* 4 Hazards Grid */}
       <View style={styles.grid}>
         {/* Tsunami */}
-        <TouchableOpacity
-          style={styles.card}
-          onPress={() => onSelectHazard && onSelectHazard('tsunami')}
-          activeOpacity={0.75}
-        >
+        <View style={styles.card}>
           <View style={styles.cardTop}>
             <View style={[styles.iconBox, { backgroundColor: 'rgba(6, 182, 212, 0.15)' }]}>
               <Waves size={16} color={colors.category.tsunami} />
@@ -102,21 +98,11 @@ export const DistanceGrid: React.FC<DistanceGridProps> = ({
           <Text style={[styles.distValue, { color: tsunamiStatus.color }]}>
             {findDist('tsunami', 1.9)}
           </Text>
-          <View style={styles.cardFooterRow}>
-            <Text style={styles.subtext}>Pesisir Padang</Text>
-            <View style={styles.navHintRow}>
-              <Navigation size={10} color={colors.brand.primary} />
-              <Text style={styles.navHintText}>Rute</Text>
-            </View>
-          </View>
-        </TouchableOpacity>
+          <Text style={styles.subtext}>Pesisir Padang</Text>
+        </View>
 
         {/* Sesar Semangko */}
-        <TouchableOpacity
-          style={styles.card}
-          onPress={() => onSelectHazard && onSelectHazard('gempa')}
-          activeOpacity={0.75}
-        >
+        <View style={styles.card}>
           <View style={styles.cardTop}>
             <View style={[styles.iconBox, { backgroundColor: 'rgba(168, 85, 247, 0.15)' }]}>
               <Activity size={16} color={colors.category.sesar} />
@@ -133,21 +119,11 @@ export const DistanceGrid: React.FC<DistanceGridProps> = ({
           <Text style={[styles.distValue, { color: sesarStatus.color }]}>
             {findDist('sesar', 36.0)}
           </Text>
-          <View style={styles.cardFooterRow}>
-            <Text style={styles.subtext}>Sianok / Semangko</Text>
-            <View style={styles.navHintRow}>
-              <Navigation size={10} color={colors.brand.primary} />
-              <Text style={styles.navHintText}>Rute</Text>
-            </View>
-          </View>
-        </TouchableOpacity>
+          <Text style={styles.subtext}>Sianok / Semangko</Text>
+        </View>
 
         {/* Galodo Marapi */}
-        <TouchableOpacity
-          style={styles.card}
-          onPress={() => onSelectHazard && onSelectHazard('galodo')}
-          activeOpacity={0.75}
-        >
+        <View style={styles.card}>
           <View style={styles.cardTop}>
             <View style={[styles.iconBox, { backgroundColor: 'rgba(244, 63, 94, 0.15)' }]}>
               <Mountain size={16} color={colors.category.galodo} />
@@ -164,21 +140,11 @@ export const DistanceGrid: React.FC<DistanceGridProps> = ({
           <Text style={[styles.distValue, { color: galodoStatus.color }]}>
             {findDist('galodo', 46.5)}
           </Text>
-          <View style={styles.cardFooterRow}>
-            <Text style={styles.subtext}>Hulu Batang Anai</Text>
-            <View style={styles.navHintRow}>
-              <Navigation size={10} color={colors.brand.primary} />
-              <Text style={styles.navHintText}>Rute</Text>
-            </View>
-          </View>
-        </TouchableOpacity>
+          <Text style={styles.subtext}>Hulu Batang Anai</Text>
+        </View>
 
         {/* Banjir DAS */}
-        <TouchableOpacity
-          style={styles.card}
-          onPress={() => onSelectHazard && onSelectHazard('banjir')}
-          activeOpacity={0.75}
-        >
+        <View style={styles.card}>
           <View style={styles.cardTop}>
             <View style={[styles.iconBox, { backgroundColor: 'rgba(56, 189, 248, 0.15)' }]}>
               <CloudRain size={16} color={colors.category.banjir} />
@@ -195,14 +161,8 @@ export const DistanceGrid: React.FC<DistanceGridProps> = ({
           <Text style={[styles.distValue, { color: banjirStatus.color }]}>
             {findDist('banjir', 5.5)}
           </Text>
-          <View style={styles.cardFooterRow}>
-            <Text style={styles.subtext}>DAS Batang Kuranji</Text>
-            <View style={styles.navHintRow}>
-              <Navigation size={10} color={colors.brand.primary} />
-              <Text style={styles.navHintText}>Rute</Text>
-            </View>
-          </View>
-        </TouchableOpacity>
+          <Text style={styles.subtext}>DAS Batang Kuranji</Text>
+        </View>
       </View>
 
       {/* Fasilitas Evakuasi Terdekat: Posko Pengungsi & Shelter TES */}
@@ -432,28 +392,6 @@ const styles = StyleSheet.create({
   miniStatusText: {
     fontSize: 8,
     fontWeight: '800',
-  },
-  cardFooterRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginTop: 2,
-    gap: 4,
-  },
-  navHintRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 2,
-    backgroundColor: 'rgba(249, 115, 22, 0.12)',
-    paddingHorizontal: 4,
-    paddingVertical: 1.5,
-    borderRadius: 4,
-    flexShrink: 0,
-  },
-  navHintText: {
-    fontSize: 8,
-    fontWeight: '700',
-    color: colors.brand.primary,
   },
   actionPillBtn: {
     flexDirection: 'row',
