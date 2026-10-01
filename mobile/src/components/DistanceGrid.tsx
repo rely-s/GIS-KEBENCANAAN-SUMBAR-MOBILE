@@ -89,13 +89,16 @@ export const DistanceGrid: React.FC<DistanceGridProps> = ({
             <View style={{ flex: 1 }}>
               <Text style={styles.hazardName}>Zona Tsunami</Text>
             </View>
+            {/* Status parameter (AMAN/WASPADA) dicomment dulu */}
+            {/*
             <View style={[styles.miniStatusBadge, { backgroundColor: tsunamiStatus.bg }]}>
               <Text style={[styles.miniStatusText, { color: tsunamiStatus.color }]}>
                 {tsunamiStatus.label}
               </Text>
             </View>
+            */}
           </View>
-          <Text style={[styles.distValue, { color: tsunamiStatus.color }]}>
+          <Text style={[styles.distValue, { color: colors.category.tsunami }]}>
             {findDist('tsunami', 1.9)}
           </Text>
           <Text style={styles.subtext}>Pesisir Padang</Text>
@@ -110,13 +113,16 @@ export const DistanceGrid: React.FC<DistanceGridProps> = ({
             <View style={{ flex: 1 }}>
               <Text style={styles.hazardName}>Sesar Darat</Text>
             </View>
+            {/* Status parameter (AMAN/WASPADA) dicomment dulu */}
+            {/*
             <View style={[styles.miniStatusBadge, { backgroundColor: sesarStatus.bg }]}>
               <Text style={[styles.miniStatusText, { color: sesarStatus.color }]}>
                 {sesarStatus.label}
               </Text>
             </View>
+            */}
           </View>
-          <Text style={[styles.distValue, { color: sesarStatus.color }]}>
+          <Text style={[styles.distValue, { color: colors.category.sesar }]}>
             {findDist('sesar', 36.0)}
           </Text>
           <Text style={styles.subtext}>Sianok / Semangko</Text>
@@ -131,13 +137,16 @@ export const DistanceGrid: React.FC<DistanceGridProps> = ({
             <View style={{ flex: 1 }}>
               <Text style={styles.hazardName}>Lahar Galodo</Text>
             </View>
+            {/* Status parameter (AMAN/WASPADA) dicomment dulu */}
+            {/*
             <View style={[styles.miniStatusBadge, { backgroundColor: galodoStatus.bg }]}>
               <Text style={[styles.miniStatusText, { color: galodoStatus.color }]}>
                 {galodoStatus.label}
               </Text>
             </View>
+            */}
           </View>
-          <Text style={[styles.distValue, { color: galodoStatus.color }]}>
+          <Text style={[styles.distValue, { color: colors.category.galodo }]}>
             {findDist('galodo', 46.5)}
           </Text>
           <Text style={styles.subtext}>Hulu Batang Anai</Text>
@@ -152,13 +161,16 @@ export const DistanceGrid: React.FC<DistanceGridProps> = ({
             <View style={{ flex: 1 }}>
               <Text style={styles.hazardName}>Rawan Banjir</Text>
             </View>
+            {/* Status parameter (AMAN/WASPADA) dicomment dulu */}
+            {/*
             <View style={[styles.miniStatusBadge, { backgroundColor: banjirStatus.bg }]}>
               <Text style={[styles.miniStatusText, { color: banjirStatus.color }]}>
                 {banjirStatus.label}
               </Text>
             </View>
+            */}
           </View>
-          <Text style={[styles.distValue, { color: banjirStatus.color }]}>
+          <Text style={[styles.distValue, { color: colors.category.banjir }]}>
             {findDist('banjir', 5.5)}
           </Text>
           <Text style={styles.subtext}>DAS Batang Kuranji</Text>

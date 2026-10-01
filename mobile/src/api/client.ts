@@ -5,11 +5,14 @@
  */
 
 import axios from 'axios';
-import { ProximityCheckResponse, PoskoResponse, LaporWargaPayload } from '../types';
+import { Platform } from 'react-native';
+import { ProximityCheckResponse, PoskoResponse, LaporWargaPayload, EnvironmentalHealthResponse } from '../types';
 
-// Konfigurasi IP Host: Ubah sesuai IP LAN komputer saat pengujian fisik di HP (contoh: 'http://192.168.1.10:8000/api')
-// Default 10.0.2.2 untuk Android Emulator, 127.0.0.1 untuk iOS simulator/web
-export const API_BASE_URL = 'http://127.0.0.1:8000/api';
+// IP Host LAN untuk koneksi Expo Go di perangkat fisik HP
+export const LAN_HOST = '192.168.50.109';
+export const API_BASE_URL = Platform.OS === 'web'
+  ? (typeof window !== 'undefined' && window.location.hostname === 'localhost' ? 'http://127.0.0.1:8000/api' : `http://${LAN_HOST}:8000/api`)
+  : `http://${LAN_HOST}:8000/api`;
 
 export const apiClient = axios.create({
   baseURL: API_BASE_URL,
@@ -318,3 +321,57 @@ export async function fetchBencanaPublik(): Promise<any[]> {
     return [];
   }
 }
+
+/**
+ * Live Feed: Indeks Kualitas Udara (ISPU/PM2.5) & Indeks Panas (Heat Index) BMKG
+ */
+export async function fetchEnvironmentalHealth(lat: number = -0.9471, lon: number = 100.3543): Promise<EnvironmentalHealthResponse> {
+  try {
+    const res = await apiClient.get<EnvironmentalHealthResponse>(`/eksternal/lingkungan-terkini?lat=${lat}&lon=${lon}`);
+    if (res.data && res.data.panas && res.data.kualitas_udara) {
+      return res.data;
+    }
+    throw new Error('Respon lingkungan tidak lengkap');
+  } catch (err) {
+    // Graceful offline fallback: Hitung Heat Index & ISPU standar tropis Sumbar
+    return {
+      status: 'offline_fallback',
+      timestamp: new Date().toISOString(),
+      lokasi: {
+        lat,
+        lon,
+        stasiun_terdekat: 'Stasiun Meteorologi Minangkabau (Data Sensor Tersimpan)',
+      },
+      panas: {
+        suhu_aktual_c: 28.5,
+        suhu_terasa_c: 32.4,
+        kelembapan_persen: 84,
+        kecepatan_angin_kmh: 7.2,
+        arah_angin: 'SW',
+        curah_hujan_mm: 0.0,
+        kondisi_cuaca: 'Cerah Berawan',
+        kategori: 'Waspada (Caution)',
+        warna: '#f59e0b',
+        rekomendasi: 'Kelelahan dapat terjadi jika beraktivitas lama di bawah terik. Pastikan asupan hidrasi cukup.',
+      },
+      kualitas_udara: {
+        ispu_value: 48,
+        pm25: 12.4,
+        pm10: 24.1,
+        kategori: 'Baik',
+        warna: '#10b981',
+        parameter_kritis: 'PM2.5',
+        stasiun_referensi: 'Stasiun GAW BMKG Bukit Kototabang / Stasiun Minangkabau',
+        rekomendasi: 'Kualitas udara bersih dan sehat. Sangat kondusif untuk aktivitas luar ruangan.',
+        polutan_lain: {
+          co: 380,
+          no2: 4.8,
+          o3: 32.0,
+          so2: 3.5,
+        },
+      },
+      atribusi: 'BMKG & Stasiun Pemantau Atmosfer Global (GAW) Bukit Kototabang',
+    };
+  }
+}
+

@@ -27,14 +27,15 @@ import * as WebBrowser from 'expo-web-browser';
 import { colors } from './src/theme/colors';
 import { Header } from './src/components/Header';
 import { HeroStatus } from './src/components/HeroStatus';
+import { EnvironmentalCard } from './src/components/EnvironmentalCard';
 import { DistanceGrid, type FacilityRouteTarget } from './src/components/DistanceGrid';
 import { WebMapHandoff } from './src/components/WebMapHandoff';
 import { ReportModal } from './src/components/ReportModal';
 import { SosModal } from './src/components/SosModal';
 import { Toast } from './src/components/Toast';
 
-import { fetchProximityCheck, fetchShelters, calculateLocalHaversineKm } from './src/api/client';
-import { ProximityCheckResponse, PoskoResponse, LaporanRecord } from './src/types';
+import { fetchProximityCheck, fetchShelters, calculateLocalHaversineKm, fetchEnvironmentalHealth } from './src/api/client';
+import { ProximityCheckResponse, PoskoResponse, LaporanRecord, EnvironmentalHealthResponse } from './src/types';
 
 export default function App() {
   return (
@@ -58,6 +59,7 @@ function MainApp() {
   // Data State
   const [proximityData, setProximityData] = useState<ProximityCheckResponse | null>(null);
   const [shelterData, setShelterData] = useState<PoskoResponse | null>(null);
+  const [envData, setEnvData] = useState<EnvironmentalHealthResponse | null>(null);
   const [isLoadingData, setIsLoadingData] = useState(true);
 
   // Modals & Feedback
@@ -139,14 +141,16 @@ function MainApp() {
         setLocationLabel('Padang Barat, Kota Padang');
       }
 
-      // Fetch Proximity & Shelters
-      const [proxRes, shelterRes] = await Promise.all([
+      // Fetch Proximity, Shelters, and Environmental Health (Heat & Air Quality BMKG)
+      const [proxRes, shelterRes, envRes] = await Promise.all([
         fetchProximityCheck(currentLat, currentLon),
         fetchShelters(currentLat, currentLon),
+        fetchEnvironmentalHealth(currentLat, currentLon),
       ]);
 
       setProximityData(proxRes);
       setShelterData(shelterRes);
+      setEnvData(envRes);
     } catch (err) {
       console.warn('Gagal sinkronisasi data awal:', err);
     } finally {
@@ -167,7 +171,7 @@ function MainApp() {
   // Handoff Pandu Rute Evakuasi ke Web GIS
   const handleOpenWebEvacuationRoute = async (target?: FacilityRouteTarget & { bencana?: string; poskoId?: number; jenis?: string }) => {
     try {
-      const webBaseUrl = 'http://127.0.0.1:5173';
+      const webBaseUrl = Platform.OS === 'web' ? 'http://127.0.0.1:5173' : 'http://192.168.50.109:5173';
       const bencanaType = target?.bencana || 'tsunami';
       let url = `${webBaseUrl}/?view=mobile_lite&action=evakuasi&userLat=${userLat}&userLon=${userLon}&zoom=16&layer=poskoEvakuasi,jalanTerputus,zonaTsunami,shelterTes`;
       
@@ -294,6 +298,9 @@ function MainApp() {
                 directive={proximityData?.primary_threat.actionable_directive || ''}
               />
 
+              {/* Pemantauan Indeks Kualitas Udara (ISPU/PM2.5) & Indeks Panas BMKG */}
+              <EnvironmentalCard data={envData} isLoading={isLoadingData} />
+
               {/* Grid Jarak Spasial Multi-Bahaya & Fasilitas Posko */}
               <DistanceGrid
                 threats={proximityData?.all_threats || []}
@@ -340,6 +347,33 @@ function MainApp() {
                 <Text style={styles.feedTitle}>INFORMASI DATA RIIL LAPANGAN</Text>
                 <Text style={styles.feedBadgeLive}>● Live Sync</Text>
               </View>
+
+              {/* Indeks Kualitas Udara (ISPU) & Panas BMKG Alert */}
+              {envData && (
+                <View style={[styles.feedCard, { borderColor: envData.kualitas_udara.warna + '60' }]}>
+                  <View style={styles.feedCardTop}>
+                    <View style={[styles.badgeGempa, { backgroundColor: envData.kualitas_udara.warna }]}>
+                      <Activity size={12} color="#ffffff" />
+                      <Text style={styles.badgeGempaText}>KUALITAS UDARA & PANAS (BMKG)</Text>
+                    </View>
+                    <Text style={styles.feedTime}>Sensor Real-Time</Text>
+                  </View>
+                  <Text style={styles.gempaTitle}>
+                    ISPU: {envData.kualitas_udara.ispu_value} ({envData.kualitas_udara.kategori}) • Suhu Terasa: {Math.round(envData.panas.suhu_terasa_c)}°C ({envData.panas.kategori.split(' ')[0]})
+                  </Text>
+                  <Text style={styles.feedDesc}>
+                    {envData.kualitas_udara.rekomendasi} {envData.panas.rekomendasi}
+                  </Text>
+                  <View style={styles.gempaFooter}>
+                    <Text style={styles.gempaCoord}>
+                      Stasiun: {envData.lokasi?.stasiun_terdekat || 'BMKG GAW Kototabang'}
+                    </Text>
+                    <Text style={[styles.safeTag, { color: envData.panas.warna, borderColor: envData.panas.warna }]}>
+                      Suhu {Math.round(envData.panas.suhu_aktual_c)}°C / Lembap {envData.panas.kelembapan_persen}%
+                    </Text>
+                  </View>
+                </View>
+              )}
 
               {/* Gempa BMKG Alert */}
               <View style={styles.feedCard}>

@@ -1,6 +1,6 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
-import { ShieldAlert, MapPin, RotateCw, PhoneCall } from 'lucide-react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Image } from 'react-native';
+import { MapPin, RotateCw, PhoneCall } from 'lucide-react-native';
 import { colors } from '../theme/colors';
 
 interface HeaderProps {
@@ -21,18 +21,41 @@ export const Header: React.FC<HeaderProps> = ({
       {/* Top Bar Brand */}
       <View style={styles.topRow}>
         <View style={styles.brandContainer}>
-          <View style={styles.logoBadge}>
-            <ShieldAlert size={20} color="#ffffff" />
+          {/* Trio Logo: BPBD, Pemprov Sumbar, & UPI YPTK */}
+          <View style={styles.logosWrapper}>
+            <View style={styles.logoBox}>
+              <Image
+                source={require('../../assets/logo-bpbd.png')}
+                style={styles.logoImage}
+                resizeMode="contain"
+              />
+            </View>
+            <View style={styles.logoBox}>
+              <Image
+                source={require('../../assets/logo-pemprov.png')}
+                style={styles.logoImage}
+                resizeMode="contain"
+              />
+            </View>
+            <View style={styles.logoBox}>
+              <Image
+                source={require('../../assets/logo-upi.png')}
+                style={styles.logoImage}
+                resizeMode="contain"
+              />
+            </View>
           </View>
-          <View>
+          <View style={styles.brandTextContainer}>
             <Text style={styles.brandTitle}>Siaga Sumbar</Text>
-            <Text style={styles.brandSubtitle}>Pusdalops PB Prov. Sumbar</Text>
+            <Text style={styles.brandSubtitle} numberOfLines={1}>
+              Pemprov Sumbar • BPBD • UPI
+            </Text>
           </View>
         </View>
 
         {/* SOS Fast Action */}
         <TouchableOpacity style={styles.sosButton} onPress={onOpenSos} activeOpacity={0.8}>
-          <PhoneCall size={14} color="#ffffff" style={{ marginRight: 4 }} />
+          <PhoneCall size={13} color="#ffffff" style={{ marginRight: 4 }} />
           <Text style={styles.sosText}>SOS 112</Text>
         </TouchableOpacity>
       </View>
@@ -80,32 +103,47 @@ const styles = StyleSheet.create({
   brandContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    gap: 7,
     flex: 1,
-    marginRight: 8,
+    marginRight: 6,
   },
-  logoBadge: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
-    backgroundColor: colors.brand.primary,
+  logosWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  logoBox: {
+    width: 30,
+    height: 30,
+    borderRadius: 8,
+    backgroundColor: '#ffffff',
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: colors.brand.primary,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.35,
-    shadowRadius: 6,
-    elevation: 4,
-    flexShrink: 0,
+    padding: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3,
+    elevation: 3,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  logoImage: {
+    width: '100%',
+    height: '100%',
+  },
+  brandTextContainer: {
+    flex: 1,
+    justifyContent: 'center',
   },
   brandTitle: {
-    fontSize: 15,
+    fontSize: 14.5,
     fontWeight: '800',
     color: colors.text.primary,
     letterSpacing: -0.3,
   },
   brandSubtitle: {
-    fontSize: 10,
+    fontSize: 9.5,
     fontWeight: '600',
     color: colors.brand.primaryLight,
   },

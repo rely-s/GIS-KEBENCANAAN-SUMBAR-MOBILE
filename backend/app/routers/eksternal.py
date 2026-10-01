@@ -125,3 +125,13 @@ async def trigger_sync_ckan():
     asyncio.get_event_loop().run_in_executor(None, run_ckan_pipeline)
     return {"message": "Proses sinkronisasi Satu Data BPBD Sumbar (CKAN) telah dimulai di latar belakang."}
 
+@router.get("/lingkungan-terkini")
+async def get_lingkungan_terkini(lat: float = -0.9471, lon: float = 100.3543):
+    """
+    Endpoint Publik: Mengembalikan informasi terpadu Indeks Kualitas Udara (ISPU / PM2.5)
+    dan Indeks Panas (Heat Index / Suhu Terasa) berbasis stasiun pengamatan BMKG Sumbar.
+    """
+    from app.services.lingkungan_service import fetch_environmental_health_data
+    data = await fetch_environmental_health_data(lat=lat, lon=lon)
+    return data
+

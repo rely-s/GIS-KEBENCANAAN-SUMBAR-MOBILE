@@ -88,22 +88,41 @@ def check_system_requirements(root_dir: Path):
     else:
         log_warn(f"Port PostgreSQL {db_port} belum aktif merespons.")
         # Opsi auto-start bila binary pg_ctl lokal ditemukan
-        pg_ctl = Path(r"E:\pgsql\bin\pg_ctl.exe")
-        pg_data = Path(r"E:\pgsql\data")
-        pg_log = Path(r"E:\pgsql\logfile.log")
-        if pg_ctl.exists() and pg_data.exists():
-            log_info("Mencoba menyalakan PostgreSQL GIS Instance secara otomatis dengan pg_ctl...")
+        pg_ctl_candidates = [
+            Path(r"C:\Program Files\PostgreSQL\18\bin\pg_ctl.exe"),
+            Path(r"C:\Program Files\PostgreSQL\17\bin\pg_ctl.exe"),
+            Path(r"C:\Program Files\PostgreSQL\16\bin\pg_ctl.exe"),
+            Path(r"E:\pgsql\bin\pg_ctl.exe"),
+        ]
+        pg_ctl = None
+        for cand in pg_ctl_candidates:
+            if cand.exists():
+                pg_ctl = cand
+                break
+        if not pg_ctl and shutil.which("pg_ctl"):
+            pg_ctl = Path(shutil.which("pg_ctl"))
+
+        pg_data_candidates = [
+            root_dir / "data_pg",
+            Path(r"E:\pgsql\data"),
+        ]
+        pg_data = None
+        for cand in pg_data_candidates:
+            if cand.exists():
+                pg_data = cand
+                break
+
+        pg_log = (pg_data / "logfile.log") if pg_data else None
+        if pg_ctl and pg_data and pg_log:
+            log_info(f"Mencoba menyalakan PostgreSQL GIS Instance ({pg_data.name}) dengan {pg_ctl.name}...")
             pid_file = pg_data / "postmaster.pid"
             if pid_file.exists():
                 try:
-                    # Bersihkan stale pid file jika postgres sebenarnya tidak berjalan
-                    pid_content = pid_file.read_text().splitlines()
-                    old_pid = int(pid_content[0].strip()) if pid_content else 0
                     if not is_port_open("127.0.0.1", db_port):
                         pid_file.unlink(missing_ok=True)
                 except Exception:
                     pass
-            subprocess.run([str(pg_ctl), "start", "-D", str(pg_data), "-l", str(pg_log), "-w", "-t", "10"], capture_output=True)
+            subprocess.run([str(pg_ctl), "start", "-D", str(pg_data), "-l", str(pg_log), "-w", "-t", "15"], capture_output=True)
             if is_port_open("127.0.0.1", db_port):
                 log_success(f"PostgreSQL GIS Instance berhasil dinyalakan di port {db_port}.")
             else:

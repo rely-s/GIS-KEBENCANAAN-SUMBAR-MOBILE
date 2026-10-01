@@ -151,3 +151,47 @@ export interface BencanaPublikItem {
   status_verifikasi: string;
   sumber_data: string;
 }
+
+export interface HeatIndexInfo {
+  suhu_aktual_c: number;
+  suhu_terasa_c: number;
+  kelembapan_persen: number;
+  kecepatan_angin_kmh: number;
+  arah_angin: string;
+  curah_hujan_mm: number;
+  kondisi_cuaca: string;
+  kategori: string;
+  warna: string;
+  rekomendasi: string;
+}
+
+export interface AirQualityInfo {
+  ispu_value: number;
+  pm25: number;
+  pm10: number;
+  kategori: string;
+  warna: string;
+  parameter_kritis: string;
+  stasiun_referensi: string;
+  rekomendasi: string;
+  polutan_lain?: {
+    co?: number;
+    no2?: number;
+    o3?: number;
+    so2?: number;
+  };
+}
+
+export interface EnvironmentalHealthResponse {
+  status: string;
+  timestamp: string;
+  lokasi: {
+    lat: number;
+    lon: number;
+    stasiun_terdekat: string;
+    adm4?: string;
+  };
+  panas: HeatIndexInfo;
+  kualitas_udara: AirQualityInfo;
+  atribusi: string;
+}
