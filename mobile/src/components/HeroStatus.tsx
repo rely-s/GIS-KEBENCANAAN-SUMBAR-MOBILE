@@ -1,7 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { ShieldCheck, AlertTriangle, Flame, CheckCircle } from 'lucide-react-native';
-import { colors } from '../theme/colors';
 import { ThreatStatus } from '../types';
 
 interface HeroStatusProps {
@@ -10,52 +9,58 @@ interface HeroStatusProps {
   lastUpdated?: string;
 }
 
-export const HeroStatus: React.FC<HeroStatusProps> = ({ status, directive, lastUpdated }) => {
+export const HeroStatus: React.FC<HeroStatusProps> = ({ status, directive }) => {
   const isDanger = status === 'BAHAYA_LANGSUNG';
   const isWarning = status === 'WASPADA';
 
   const config = isDanger
     ? {
-        bg: '#7f1d1d', // Red 900
-        border: '#991b1b', // Red 800
-        iconBg: '#ef4444', // Red 500
-        text: '#fecaca', // Red 200
+        bg: '#7f1d1d', // Deep Red
+        border: '#991b1b',
+        iconBg: '#ef4444',
+        text: '#fecaca',
         badgeText: 'STATUS BAHAYA',
         Icon: Flame,
+        WatermarkIcon: Flame,
       }
     : isWarning
     ? {
-        bg: '#78350f', // Amber 900
-        border: '#92400e', // Amber 800
-        iconBg: '#f59e0b', // Amber 500
-        text: '#fde68a', // Amber 200
+        bg: '#78350f', // Deep Amber
+        border: '#92400e',
+        iconBg: '#f59e0b',
+        text: '#fde68a',
         badgeText: 'STATUS WASPADA',
         Icon: AlertTriangle,
+        WatermarkIcon: AlertTriangle,
       }
     : {
-        bg: '#064e3b', // Emerald 900
-        border: '#065f46', // Emerald 800
-        iconBg: '#10b981', // Emerald 500
-        text: '#d1fae5', // Emerald 100
+        bg: '#064e3b', // Deep Emerald Green
+        border: '#065f46',
+        iconBg: '#10b981',
+        text: '#d1fae5',
         badgeText: 'STATUS AMAN',
         Icon: ShieldCheck,
+        WatermarkIcon: CheckCircle,
       };
 
-  const { Icon } = config;
+  const { Icon, WatermarkIcon } = config;
 
   return (
     <View style={[styles.container, { backgroundColor: config.bg, borderColor: config.border }]}>
+      {/* Background Watermark */}
       <View style={styles.bgIconWrapper}>
-        <CheckCircle size={100} color={config.iconBg} opacity={0.15} />
+        <WatermarkIcon size={110} color={config.iconBg} opacity={0.12} />
       </View>
-      
+
+      {/* Centered Content */}
       <View style={styles.contentWrapper}>
-        <View style={[styles.iconCircle, { backgroundColor: config.iconBg, shadowColor: config.iconBg }]}>
-          <Icon size={24} color="#ffffff" />
+        <View style={[styles.iconCircle, { backgroundColor: config.iconBg }]}>
+          <Icon size={26} color="#ffffff" strokeWidth={2.5} />
         </View>
+
         <Text style={styles.badgeLabel}>{config.badgeText}</Text>
         <Text style={[styles.directiveText, { color: config.text }]}>
-          {directive || 'Anda berada di luar zona bahaya terdekat.'}
+          {directive || 'Jika merasakan guncangan gempa kuat >20 detik, segera lari menjauhi pantai menuju shelter TES vertikal (>15 mdpl).'}
         </Text>
       </View>
     </View>
@@ -64,22 +69,18 @@ export const HeroStatus: React.FC<HeroStatusProps> = ({ status, directive, lastU
 
 const styles = StyleSheet.create({
   container: {
-    borderRadius: 18,
-    padding: 16,
+    borderRadius: 22,
+    paddingVertical: 18,
+    paddingHorizontal: 16,
     borderWidth: 1,
     marginVertical: 6,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 4,
     position: 'relative',
     overflow: 'hidden',
   },
   bgIconWrapper: {
     position: 'absolute',
     right: -20,
-    bottom: -20,
+    bottom: -25,
     zIndex: 0,
   },
   contentWrapper: {
@@ -88,30 +89,33 @@ const styles = StyleSheet.create({
     zIndex: 10,
   },
   iconCircle: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
+    width: 52,
+    height: 52,
+    borderRadius: 26,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 10,
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.6,
-    shadowRadius: 15,
-    elevation: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    elevation: 4,
   },
   badgeLabel: {
     fontSize: 18,
     fontWeight: '900',
     color: '#ffffff',
-    letterSpacing: 0.5,
-    marginBottom: 4,
+    letterSpacing: 0.6,
+    marginBottom: 5,
+    textTransform: 'uppercase',
   },
   directiveText: {
     fontSize: 11.5,
     fontWeight: '400',
     textAlign: 'center',
-    lineHeight: 16,
-    opacity: 0.85,
-    paddingHorizontal: 8,
+    lineHeight: 16.5,
+    opacity: 0.9,
+    paddingHorizontal: 6,
   },
 });
+

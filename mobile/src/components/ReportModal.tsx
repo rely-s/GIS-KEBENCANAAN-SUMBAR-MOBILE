@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   View,
   Text,
@@ -15,7 +15,8 @@ import * as ImagePicker from 'expo-image-picker';
 import * as ImageManipulator from 'expo-image-manipulator';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Camera, Image as ImageIcon, X, MapPin, Send, CheckCircle2, AlertCircle, Phone } from 'lucide-react-native';
-import { colors } from '../theme/colors';
+import { useTheme } from '../theme/ThemeContext';
+import { ThemeColors } from '../theme/colors';
 import { sendLaporanKejadian } from '../api/client';
 import { LaporanRecord } from '../types';
 
@@ -38,6 +39,9 @@ export const ReportModal: React.FC<ReportModalProps> = ({
   onReportSuccess,
   onShowToast,
 }) => {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+
   const [jenisBencana, setJenisBencana] = useState('Banjir / Genangan Air');
   const [urgensi, setUrgensi] = useState<'normal' | 'darurat'>('normal');
   const [keterangan, setKeterangan] = useState('');
@@ -337,7 +341,8 @@ export const ReportModal: React.FC<ReportModalProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemeColors) =>
+  StyleSheet.create({
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(2, 6, 23, 0.85)',

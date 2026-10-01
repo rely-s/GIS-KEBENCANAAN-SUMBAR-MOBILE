@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { View, Text, Modal, TouchableOpacity, StyleSheet, Linking } from 'react-native';
 import { PhoneCall, X, Share2, Shield, HeartPulse } from 'lucide-react-native';
-import { colors } from '../theme/colors';
+import { useTheme } from '../theme/ThemeContext';
+import { ThemeColors } from '../theme/colors';
 
 interface SosModalProps {
   visible: boolean;
@@ -18,6 +19,9 @@ export const SosModal: React.FC<SosModalProps> = ({
   userLon,
   onShowToast,
 }) => {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+
   const dialPhone = (number: string) => {
     Linking.openURL(`tel:${number}`).catch(() => {});
   };
@@ -85,7 +89,7 @@ export const SosModal: React.FC<SosModalProps> = ({
 
             {/* Share GPS Coordinates */}
             <TouchableOpacity
-              style={[styles.btnAction, { backgroundColor: 'rgba(249, 115, 22, 0.15)', borderWidth: 1, borderColor: 'rgba(249, 115, 22, 0.4)' }]}
+              style={[styles.btnAction, { backgroundColor: colors.brand.primaryFaint, borderWidth: 1, borderColor: colors.brand.primary }]}
               onPress={shareCoordinates}
               activeOpacity={0.8}
             >
@@ -101,7 +105,8 @@ export const SosModal: React.FC<SosModalProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemeColors) =>
+  StyleSheet.create({
   overlay: {
     flex: 1,
     backgroundColor: 'rgba(2, 6, 23, 0.85)',

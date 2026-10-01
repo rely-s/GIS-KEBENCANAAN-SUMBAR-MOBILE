@@ -14,6 +14,7 @@ import * as Location from 'expo-location';
 import {
   Home,
   Plus,
+  PlusCircle,
   Radio,
   FileText,
   Activity,
@@ -21,10 +22,13 @@ import {
   ChevronRight,
   ShieldAlert,
   PhoneCall,
+  Sun,
+  Moon,
 } from 'lucide-react-native';
 
 import * as WebBrowser from 'expo-web-browser';
-import { colors } from './src/theme/colors';
+import { ThemeColors } from './src/theme/colors';
+import { ThemeProvider, useTheme } from './src/theme/ThemeContext';
 import { Header } from './src/components/Header';
 import { HeroStatus } from './src/components/HeroStatus';
 import { EnvironmentalCard } from './src/components/EnvironmentalCard';
@@ -40,13 +44,18 @@ import { ProximityCheckResponse, PoskoResponse, LaporanRecord, EnvironmentalHeal
 export default function App() {
   return (
     <SafeAreaProvider>
-      <MainApp />
+      <ThemeProvider>
+        <MainApp />
+      </ThemeProvider>
     </SafeAreaProvider>
   );
 }
 
 function MainApp() {
   const insets = useSafeAreaInsets();
+  const { theme, isDark, colors, toggleTheme } = useTheme();
+  const styles = useMemo(() => createStyles(colors, isDark), [colors, isDark]);
+
   // Navigation State
   const [activeTab, setActiveTab] = useState<'beranda' | 'feed' | 'riwayat'>('beranda');
 
@@ -124,7 +133,7 @@ function MainApp() {
               const name = [r.district, r.city || r.subregion].filter(Boolean).join(', ');
               if (name) setLocationLabel(name);
             }
-          } catch (_) {}
+          } catch (_) { }
         } else {
           currentLat = -0.9471;
           currentLon = 100.3543;
@@ -174,7 +183,7 @@ function MainApp() {
       const webBaseUrl = Platform.OS === 'web' ? 'http://127.0.0.1:5173' : 'http://192.168.50.109:5173';
       const bencanaType = target?.bencana || 'tsunami';
       let url = `${webBaseUrl}/?view=mobile_lite&action=evakuasi&userLat=${userLat}&userLon=${userLon}&zoom=16&layer=poskoEvakuasi,jalanTerputus,zonaTsunami,shelterTes`;
-      
+
       if (target?.lat && target?.lon) {
         url += `&destLat=${target.lat}&destLon=${target.lon}`;
       }
@@ -256,7 +265,7 @@ function MainApp() {
   return (
     <View style={[styles.safeArea, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
       <StatusBar
-        barStyle="light-content"
+        barStyle={isDark ? 'light-content' : 'dark-content'}
         backgroundColor={colors.surface.canvas}
         translucent={Platform.OS === 'android'}
       />
@@ -309,13 +318,13 @@ function MainApp() {
                 shelterTarget={
                   nearestTesFeature
                     ? {
-                        id: nearestTesFeature.properties.id,
-                        nama: nearestTesFeature.properties.nama,
-                        lat: nearestTesFeature.geometry.coordinates[1],
-                        lon: nearestTesFeature.geometry.coordinates[0],
-                        jenis: nearestTesFeature.properties.jenis || 'shelter_tes_tea',
-                        bencana: 'tsunami',
-                      }
+                      id: nearestTesFeature.properties.id,
+                      nama: nearestTesFeature.properties.nama,
+                      lat: nearestTesFeature.geometry.coordinates[1],
+                      lon: nearestTesFeature.geometry.coordinates[0],
+                      jenis: nearestTesFeature.properties.jenis || 'shelter_tes_tea',
+                      bencana: 'tsunami',
+                    }
                     : undefined
                 }
                 nearestPoskoKm={nearestPoskoDistKm}
@@ -323,13 +332,13 @@ function MainApp() {
                 poskoTarget={
                   nearestPoskoFeature
                     ? {
-                        id: nearestPoskoFeature.properties.id,
-                        nama: nearestPoskoFeature.properties.nama,
-                        lat: nearestPoskoFeature.geometry.coordinates[1],
-                        lon: nearestPoskoFeature.geometry.coordinates[0],
-                        jenis: nearestPoskoFeature.properties.jenis || 'posko_utama',
-                        bencana: 'gempa',
-                      }
+                      id: nearestPoskoFeature.properties.id,
+                      nama: nearestPoskoFeature.properties.nama,
+                      lat: nearestPoskoFeature.geometry.coordinates[1],
+                      lon: nearestPoskoFeature.geometry.coordinates[0],
+                      jenis: nearestPoskoFeature.properties.jenis || 'posko_utama',
+                      bencana: 'gempa',
+                    }
                     : undefined
                 }
                 onOpenRoute={handleOpenWebEvacuationRoute}
@@ -344,17 +353,19 @@ function MainApp() {
           {activeTab === 'feed' && (
             <View style={styles.tabContent}>
               <View style={styles.feedHeader}>
-                <Text style={styles.feedTitle}>INFORMASI DATA RIIL LAPANGAN</Text>
+                <Text style={styles.feedTitle}>INFORMASI DATA </Text>
                 <Text style={styles.feedBadgeLive}>● Live Sync</Text>
               </View>
 
               {/* Indeks Kualitas Udara (ISPU) & Panas BMKG Alert */}
               {envData && (
-                <View style={[styles.feedCard, { borderColor: envData.kualitas_udara.warna + '60' }]}>
+                <View style={styles.feedCard}>
                   <View style={styles.feedCardTop}>
-                    <View style={[styles.badgeGempa, { backgroundColor: envData.kualitas_udara.warna }]}>
-                      <Activity size={12} color="#ffffff" />
-                      <Text style={styles.badgeGempaText}>KUALITAS UDARA & PANAS (BMKG)</Text>
+                    <View style={[styles.badgePill, { backgroundColor: isDark ? 'rgba(100, 210, 255, 0.15)' : 'rgba(37, 99, 235, 0.12)' }]}>
+                      <Activity size={12} color={isDark ? '#64D2FF' : '#1D4ED8'} />
+                      <Text style={[styles.badgePillText, { color: isDark ? '#64D2FF' : '#1D4ED8' }]}>
+                        KUALITAS UDARA & PANAS (BMKG)
+                      </Text>
                     </View>
                     <Text style={styles.feedTime}>Sensor Real-Time</Text>
                   </View>
@@ -365,12 +376,14 @@ function MainApp() {
                     {envData.kualitas_udara.rekomendasi} {envData.panas.rekomendasi}
                   </Text>
                   <View style={styles.gempaFooter}>
-                    <Text style={styles.gempaCoord}>
+                    <Text style={styles.gempaCoord} numberOfLines={1}>
                       Stasiun: {envData.lokasi?.stasiun_terdekat || 'BMKG GAW Kototabang'}
                     </Text>
-                    <Text style={[styles.safeTag, { color: envData.panas.warna, borderColor: envData.panas.warna }]}>
-                      Suhu {Math.round(envData.panas.suhu_aktual_c)}°C / Lembap {envData.panas.kelembapan_persen}%
-                    </Text>
+                    <View style={styles.metaTagPill}>
+                      <Text style={[styles.metaTagText, { color: isDark ? colors.brand.primary : '#B45309' }]}>
+                        Suhu {Math.round(envData.panas.suhu_aktual_c)}°C / Lembap {envData.panas.kelembapan_persen}%
+                      </Text>
+                    </View>
                   </View>
                 </View>
               )}
@@ -378,9 +391,11 @@ function MainApp() {
               {/* Gempa BMKG Alert */}
               <View style={styles.feedCard}>
                 <View style={styles.feedCardTop}>
-                  <View style={styles.badgeGempa}>
-                    <Activity size={12} color="#ffffff" />
-                    <Text style={styles.badgeGempaText}>GEMPA TERKINI (BMKG)</Text>
+                  <View style={[styles.badgePill, { backgroundColor: isDark ? 'rgba(10, 132, 255, 0.15)' : 'rgba(2, 132, 199, 0.12)' }]}>
+                    <Activity size={12} color={isDark ? '#64D2FF' : '#0369A1'} />
+                    <Text style={[styles.badgePillText, { color: isDark ? '#64D2FF' : '#0369A1' }]}>
+                      GEMPA TERKINI (BMKG)
+                    </Text>
                   </View>
                   <Text style={styles.feedTime}>35 Menit lalu</Text>
                 </View>
@@ -390,16 +405,22 @@ function MainApp() {
                 </Text>
                 <View style={styles.gempaFooter}>
                   <Text style={styles.gempaCoord}>Koordinat: 0.12 LU, 99.78 BT</Text>
-                  <Text style={styles.safeTag}>Aman Tsunami</Text>
+                  <View style={styles.metaTagPill}>
+                    <Text style={[styles.metaTagText, { color: isDark ? colors.status.safeText : '#15803D' }]}>
+                      Aman Tsunami
+                    </Text>
+                  </View>
                 </View>
               </View>
 
               {/* Ruas Jalan Terputus (Road Blockage) */}
-              <View style={[styles.feedCard, { borderColor: 'rgba(239, 68, 68, 0.35)' }]}>
+              <View style={styles.feedCard}>
                 <View style={styles.feedCardTop}>
-                  <View style={[styles.badgeGempa, { backgroundColor: '#dc2626' }]}>
-                    <AlertTriangle size={12} color="#ffffff" />
-                    <Text style={styles.badgeGempaText}>JALAN TERPUTUS (BLOKADE)</Text>
+                  <View style={[styles.badgePill, { backgroundColor: isDark ? 'rgba(255, 69, 58, 0.15)' : 'rgba(220, 38, 38, 0.12)' }]}>
+                    <AlertTriangle size={12} color={isDark ? '#FF453A' : '#B91C1C'} />
+                    <Text style={[styles.badgePillText, { color: isDark ? '#FF453A' : '#B91C1C' }]}>
+                      JALAN TERPUTUS (BLOKADE)
+                    </Text>
                   </View>
                   <Text style={styles.feedTime}>2 Jam lalu</Text>
                 </View>
@@ -412,9 +433,11 @@ function MainApp() {
               {/* Bencana Terverifikasi Pusdalops */}
               <View style={styles.feedCard}>
                 <View style={styles.feedCardTop}>
-                  <View style={[styles.badgeGempa, { backgroundColor: colors.brand.primary }]}>
-                    <ShieldAlert size={12} color="#ffffff" />
-                    <Text style={styles.badgeGempaText}>VERIFIKASI PUSDALOPS</Text>
+                  <View style={[styles.badgePill, { backgroundColor: isDark ? 'rgba(255, 159, 10, 0.15)' : 'rgba(217, 119, 6, 0.12)' }]}>
+                    <ShieldAlert size={12} color={isDark ? '#FF9F0A' : '#B45309'} />
+                    <Text style={[styles.badgePillText, { color: isDark ? '#FF9F0A' : '#B45309' }]}>
+                      VERIFIKASI PUSDALOPS
+                    </Text>
                   </View>
                   <Text style={styles.feedTime}>4 Jam lalu</Text>
                 </View>
@@ -440,6 +463,37 @@ function MainApp() {
                   <View style={styles.profileStatusBadge}>
                     <Text style={styles.profileStatusText}>● Akun Pelapor Aktif</Text>
                   </View>
+                </View>
+              </View>
+
+              {/* Pengaturan Tampilan Tema (Dark/Light Mode) */}
+              <View style={styles.themeSettingsCard}>
+                <View style={styles.themeRow}>
+                  <View style={styles.themeLeft}>
+                    <View style={styles.themeIconCircle}>
+                      {isDark ? (
+                        <Moon size={16} color={colors.brand.primary} />
+                      ) : (
+                        <Sun size={16} color={colors.brand.primary} />
+                      )}
+                    </View>
+                    <View>
+                      <Text style={styles.themeTitle}>Mode Tampilan</Text>
+                      <Text style={styles.themeSubtitle}>
+                        {isDark ? 'Mode Gelap Aktif (Dark Mode)' : 'Mode Terang Aktif (Light Mode)'}
+                      </Text>
+                    </View>
+                  </View>
+
+                  <TouchableOpacity
+                    style={styles.toggleThemeBtn}
+                    onPress={toggleTheme}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={styles.toggleThemeBtnText}>
+                      {isDark ? 'Ganti ke Terang' : 'Ganti ke Gelap'}
+                    </Text>
+                  </TouchableOpacity>
                 </View>
               </View>
 
@@ -480,8 +534,8 @@ function MainApp() {
         </ScrollView>
       )}
 
-      {/* Bottom Navigation Bar */}
-      <View style={styles.bottomNav}>
+      {/* Native iOS Tab Bar */}
+      <View style={[styles.bottomNav, { paddingBottom: Math.max(insets.bottom, 4) }]}>
         {/* Nav Beranda */}
         <TouchableOpacity
           style={styles.navBtn}
@@ -489,48 +543,51 @@ function MainApp() {
           activeOpacity={0.7}
         >
           <Home
-            size={22}
+            size={21}
             color={activeTab === 'beranda' ? colors.brand.primary : colors.text.muted}
           />
           <Text
             style={[
               styles.navBtnLabel,
-              activeTab === 'beranda' && { color: colors.brand.primary, fontWeight: '800' },
+              activeTab === 'beranda' && styles.navBtnLabelActive,
             ]}
           >
             Beranda
           </Text>
         </TouchableOpacity>
 
-        {/* Center Floating (+) Lapor Button */}
-        <View style={styles.fabWrapper}>
-          <TouchableOpacity
-            style={styles.fabButton}
-            onPress={() => setIsReportOpen(true)}
-            activeOpacity={0.9}
-          >
-            <Plus size={26} color="#ffffff" strokeWidth={3} />
-          </TouchableOpacity>
-          <Text style={styles.fabLabel}>Lapor</Text>
-        </View>
-
-        {/* Nav Feed Data Riil */}
+        {/* Nav Data Riil */}
         <TouchableOpacity
           style={styles.navBtn}
           onPress={() => setActiveTab('feed')}
           activeOpacity={0.7}
         >
           <Radio
-            size={22}
+            size={21}
             color={activeTab === 'feed' ? colors.brand.primary : colors.text.muted}
           />
           <Text
             style={[
               styles.navBtnLabel,
-              activeTab === 'feed' && { color: colors.brand.primary, fontWeight: '800' },
+              activeTab === 'feed' && styles.navBtnLabelActive,
             ]}
           >
-            Data Riil
+            Informasi Data Bencana
+          </Text>
+        </TouchableOpacity>
+
+        {/* Nav Lapor (iOS Clean Action Tab) */}
+        <TouchableOpacity
+          style={styles.navBtn}
+          onPress={() => setIsReportOpen(true)}
+          activeOpacity={0.7}
+        >
+          <PlusCircle
+            size={21}
+            color={colors.text.muted}
+          />
+          <Text style={styles.navBtnLabel}>
+            Lapor
           </Text>
         </TouchableOpacity>
 
@@ -541,13 +598,13 @@ function MainApp() {
           activeOpacity={0.7}
         >
           <FileText
-            size={22}
+            size={21}
             color={activeTab === 'riwayat' ? colors.brand.primary : colors.text.muted}
           />
           <Text
             style={[
               styles.navBtnLabel,
-              activeTab === 'riwayat' && { color: colors.brand.primary, fontWeight: '800' },
+              activeTab === 'riwayat' && styles.navBtnLabelActive,
             ]}
           >
             Riwayat
@@ -578,318 +635,359 @@ function MainApp() {
   );
 }
 
-const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: colors.surface.canvas,
-  },
-  centerLoading: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 12,
-  },
-  loadingText: {
-    fontSize: 12,
-    color: colors.text.secondary,
-    fontWeight: '600',
-  },
-  mainScroll: {
-    flex: 1,
-  },
-  scrollContent: {
-    paddingHorizontal: 14,
-    paddingBottom: 24,
-  },
-  tabContent: {
-    paddingTop: 4,
-  },
-  fastCallBanner: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    backgroundColor: '#b91c1c',
-    borderRadius: 18,
-    padding: 14,
-    marginTop: 10,
-    marginBottom: 6,
-  },
-  callBannerTitle: {
-    fontSize: 13,
-    fontWeight: '800',
-    color: '#ffffff',
-  },
-  callBannerSub: {
-    fontSize: 10,
-    color: '#fecaca',
-    marginTop: 1,
-  },
-  call112Btn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: '#ffffff',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 12,
-  },
-  call112Text: {
-    fontSize: 11.5,
-    fontWeight: '800',
-    color: '#dc2626',
-  },
-  // Feed Tab Styles
-  feedHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginVertical: 10,
-    paddingHorizontal: 2,
-  },
-  feedTitle: {
-    fontSize: 11,
-    fontWeight: '800',
-    color: colors.text.secondary,
-    letterSpacing: 0.5,
-  },
-  feedBadgeLive: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: colors.status.safeText,
-  },
-  feedBadgeCount: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: colors.brand.primary,
-  },
-  feedCard: {
-    backgroundColor: colors.surface.card,
-    borderRadius: 18,
-    padding: 14,
-    marginBottom: 10,
-    borderWidth: 1,
-    borderColor: colors.surface.borderSubtle,
-  },
-  feedCardTop: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  badgeGempa: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    backgroundColor: '#0284c7',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 6,
-  },
-  badgeGempaText: {
-    fontSize: 9,
-    fontWeight: '800',
-    color: '#ffffff',
-  },
-  feedTime: {
-    fontSize: 10,
-    color: colors.text.muted,
-  },
-  gempaTitle: {
-    fontSize: 13,
-    fontWeight: '800',
-    color: colors.text.primary,
-    marginBottom: 4,
-  },
-  feedDesc: {
-    fontSize: 11,
-    color: colors.text.secondary,
-    lineHeight: 16,
-  },
-  gempaFooter: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginTop: 10,
-    paddingTop: 8,
-    borderTopWidth: 1,
-    borderColor: colors.surface.borderSubtle,
-  },
-  gempaCoord: {
-    fontSize: 10,
-    color: colors.text.muted,
-    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
-  },
-  safeTag: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: colors.status.safeText,
-  },
-  // Profile & Reports Styles
-  profileCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    backgroundColor: colors.surface.card,
-    borderRadius: 18,
-    padding: 14,
-    borderWidth: 1,
-    borderColor: colors.surface.borderSubtle,
-    marginBottom: 6,
-  },
-  avatarCircle: {
-    width: 46,
-    height: 46,
-    borderRadius: 23,
-    backgroundColor: colors.brand.primaryFaint,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: colors.brand.primary,
-  },
-  avatarText: {
-    fontSize: 15,
-    fontWeight: '900',
-    color: colors.brand.primary,
-  },
-  profileName: {
-    fontSize: 13.5,
-    fontWeight: '800',
-    color: colors.text.primary,
-  },
-  profileMeta: {
-    fontSize: 10.5,
-    color: colors.text.secondary,
-    marginTop: 1,
-  },
-  profileStatusBadge: {
-    alignSelf: 'flex-start',
-    backgroundColor: 'rgba(16, 185, 129, 0.12)',
-    paddingHorizontal: 7,
-    paddingVertical: 2,
-    borderRadius: 6,
-    marginTop: 4,
-  },
-  profileStatusText: {
-    fontSize: 9.5,
-    fontWeight: '700',
-    color: colors.status.safeText,
-  },
-  emptyReports: {
-    paddingVertical: 30,
-    alignItems: 'center',
-  },
-  emptyText: {
-    fontSize: 11.5,
-    color: colors.text.muted,
-  },
-  reportItemCard: {
-    backgroundColor: colors.surface.card,
-    borderRadius: 16,
-    padding: 12,
-    marginBottom: 8,
-    borderWidth: 1,
-    borderColor: colors.surface.borderSubtle,
-  },
-  reportItemTop: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 4,
-  },
-  reportItemType: {
-    fontSize: 12,
-    fontWeight: '800',
-    color: colors.text.primary,
-  },
-  badgeStatusReport: {
-    backgroundColor: 'rgba(245, 158, 11, 0.15)',
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 6,
-  },
-  badgeStatusReportText: {
-    fontSize: 9,
-    fontWeight: '700',
-    color: colors.status.warningText,
-  },
-  reportItemLoc: {
-    fontSize: 10,
-    color: colors.brand.primary,
-    marginBottom: 4,
-  },
-  reportItemDesc: {
-    fontSize: 11,
-    color: colors.text.secondary,
-    fontStyle: 'italic',
-    lineHeight: 15,
-  },
-  reportItemFooter: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginTop: 8,
-  },
-  reportItemTime: {
-    fontSize: 9.5,
-    color: colors.text.muted,
-  },
-  progressBarBg: {
-    width: 60,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: colors.surface.cardSecondary,
-    overflow: 'hidden',
-  },
-  progressBarFill: {
-    width: '40%',
-    height: '100%',
-    backgroundColor: colors.status.warningText,
-  },
-  // Bottom Navigation
-  bottomNav: {
-    height: 62,
-    backgroundColor: 'rgba(15, 23, 42, 0.98)',
-    borderTopWidth: 1,
-    borderColor: colors.surface.borderSubtle,
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    alignItems: 'center',
-    paddingHorizontal: 12,
-  },
-  navBtn: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    width: 65,
-  },
-  navBtnLabel: {
-    fontSize: 9.5,
-    color: colors.text.muted,
-    fontWeight: '600',
-    marginTop: 3,
-  },
-  fabWrapper: {
-    alignItems: 'center',
-    marginTop: -22,
-  },
-  fabButton: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: colors.brand.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: colors.brand.primary,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.45,
-    shadowRadius: 8,
-    elevation: 6,
-    borderWidth: 3,
-    borderColor: colors.surface.canvas,
-  },
-  fabLabel: {
-    fontSize: 9,
-    fontWeight: '800',
-    color: colors.brand.primary,
-    marginTop: 2,
-  },
-});
+const createStyles = (colors: ThemeColors, isDark: boolean) =>
+  StyleSheet.create({
+    safeArea: {
+      flex: 1,
+      backgroundColor: colors.surface.canvas,
+    },
+    centerLoading: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 12,
+    },
+    loadingText: {
+      fontSize: 12,
+      color: colors.text.secondary,
+      fontWeight: '600',
+    },
+    mainScroll: {
+      flex: 1,
+    },
+    scrollContent: {
+      paddingHorizontal: 14,
+      paddingBottom: 24,
+    },
+    tabContent: {
+      paddingTop: 4,
+    },
+    fastCallBanner: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      backgroundColor: '#b91c1c',
+      borderRadius: 18,
+      padding: 14,
+      marginTop: 10,
+      marginBottom: 6,
+    },
+    callBannerTitle: {
+      fontSize: 13,
+      fontWeight: '800',
+      color: '#ffffff',
+    },
+    callBannerSub: {
+      fontSize: 10,
+      color: '#fecaca',
+      marginTop: 1,
+    },
+    call112Btn: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      backgroundColor: '#ffffff',
+      paddingHorizontal: 12,
+      paddingVertical: 8,
+      borderRadius: 12,
+    },
+    call112Text: {
+      fontSize: 11.5,
+      fontWeight: '800',
+      color: '#dc2626',
+    },
+    // Feed Tab Styles
+    feedHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginVertical: 10,
+      paddingHorizontal: 2,
+    },
+    feedTitle: {
+      fontSize: 11,
+      fontWeight: '800',
+      color: colors.text.secondary,
+      letterSpacing: 0.5,
+    },
+    feedBadgeLive: {
+      fontSize: 10,
+      fontWeight: '700',
+      color: colors.status.safeText,
+    },
+    feedBadgeCount: {
+      fontSize: 10,
+      fontWeight: '700',
+      color: colors.brand.primary,
+    },
+    feedCard: {
+      backgroundColor: colors.surface.card, // Apple #1C1C1E
+      borderRadius: 14,
+      padding: 14,
+      marginBottom: 10,
+      borderWidth: 0.5,
+      borderColor: colors.surface.borderSubtle,
+    },
+    feedCardTop: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: 8,
+    },
+    badgePill: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 5,
+      paddingHorizontal: 8,
+      paddingVertical: 3,
+      borderRadius: 6,
+    },
+    badgePillText: {
+      fontSize: 10,
+      fontWeight: '700',
+      letterSpacing: 0.3,
+    },
+    feedTime: {
+      fontSize: 10.5,
+      color: colors.text.muted,
+      fontWeight: '500',
+    },
+    gempaTitle: {
+      fontSize: 14,
+      fontWeight: '700',
+      color: colors.text.primary,
+      marginBottom: 4,
+      lineHeight: 19,
+    },
+    feedDesc: {
+      fontSize: 12,
+      color: colors.text.secondary,
+      lineHeight: 18,
+    },
+    gempaFooter: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginTop: 10,
+      paddingTop: 8,
+      borderTopWidth: 0.5,
+      borderColor: colors.surface.border,
+    },
+    gempaCoord: {
+      fontSize: 10.5,
+      color: colors.text.secondary,
+      fontWeight: '500',
+      fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+      flex: 1,
+      marginRight: 6,
+    },
+    metaTagPill: {
+      backgroundColor: colors.surface.cardSecondary,
+      paddingHorizontal: 8,
+      paddingVertical: 3,
+      borderRadius: 6,
+    },
+    metaTagText: {
+      fontSize: 10,
+      fontWeight: '700',
+    },
+    // Profile & Reports Styles
+    profileCard: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+      backgroundColor: colors.surface.card,
+      borderRadius: 14,
+      padding: 14,
+      borderWidth: 0.5,
+      borderColor: colors.surface.borderSubtle,
+      marginBottom: 6,
+    },
+    avatarCircle: {
+      width: 44,
+      height: 44,
+      borderRadius: 22,
+      backgroundColor: colors.surface.cardSecondary,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderWidth: 0.5,
+      borderColor: colors.surface.border,
+    },
+    avatarText: {
+      fontSize: 15,
+      fontWeight: '700',
+      color: colors.brand.primary,
+    },
+    profileName: {
+      fontSize: 13.5,
+      fontWeight: '600',
+      color: colors.text.primary,
+    },
+    profileMeta: {
+      fontSize: 10.5,
+      color: colors.text.secondary,
+      marginTop: 1,
+    },
+    profileStatusBadge: {
+      alignSelf: 'flex-start',
+      backgroundColor: 'rgba(48, 209, 88, 0.12)',
+      paddingHorizontal: 7,
+      paddingVertical: 2,
+      borderRadius: 4,
+      marginTop: 4,
+    },
+    profileStatusText: {
+      fontSize: 9.5,
+      fontWeight: '600',
+      color: colors.status.safeText,
+    },
+    emptyReports: {
+      paddingVertical: 30,
+      alignItems: 'center',
+    },
+    emptyText: {
+      fontSize: 11.5,
+      color: colors.text.muted,
+    },
+    reportItemCard: {
+      backgroundColor: colors.surface.card,
+      borderRadius: 14,
+      padding: 12,
+      marginBottom: 8,
+      borderWidth: 0.5,
+      borderColor: colors.surface.borderSubtle,
+    },
+    reportItemTop: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: 4,
+    },
+    reportItemType: {
+      fontSize: 12,
+      fontWeight: '600',
+      color: colors.text.primary,
+    },
+    badgeStatusReport: {
+      backgroundColor: 'rgba(255, 159, 10, 0.12)',
+      paddingHorizontal: 7,
+      paddingVertical: 2,
+      borderRadius: 4,
+    },
+    badgeStatusReportText: {
+      fontSize: 9,
+      fontWeight: '600',
+      color: colors.status.warningText,
+    },
+    reportItemLoc: {
+      fontSize: 10.5,
+      color: colors.brand.primary,
+      marginBottom: 4,
+    },
+    reportItemDesc: {
+      fontSize: 11,
+      color: colors.text.secondary,
+      lineHeight: 15,
+    },
+    reportItemFooter: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginTop: 8,
+    },
+    reportItemTime: {
+      fontSize: 9.5,
+      color: colors.text.muted,
+    },
+    progressBarBg: {
+      width: 60,
+      height: 4,
+      borderRadius: 2,
+      backgroundColor: colors.surface.cardSecondary,
+      overflow: 'hidden',
+    },
+    progressBarFill: {
+      width: '40%',
+      height: '100%',
+      backgroundColor: colors.status.warningText,
+    },
+    // Theme Settings Card
+    themeSettingsCard: {
+      backgroundColor: colors.surface.card,
+      borderRadius: 14,
+      padding: 12,
+      borderWidth: 0.5,
+      borderColor: colors.surface.borderSubtle,
+      marginBottom: 10,
+    },
+    themeRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: 10,
+    },
+    themeLeft: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+      flex: 1,
+    },
+    themeIconCircle: {
+      width: 32,
+      height: 32,
+      borderRadius: 8,
+      backgroundColor: colors.brand.primaryFaint,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    themeTitle: {
+      fontSize: 12.5,
+      fontWeight: '600',
+      color: colors.text.primary,
+    },
+    themeSubtitle: {
+      fontSize: 10.5,
+      color: colors.text.secondary,
+      marginTop: 1,
+    },
+    toggleThemeBtn: {
+      backgroundColor: colors.surface.cardSecondary,
+      paddingHorizontal: 10,
+      paddingVertical: 6,
+      borderRadius: 8,
+      borderWidth: 0.5,
+      borderColor: colors.surface.border,
+    },
+    toggleThemeBtnText: {
+      fontSize: 11,
+      fontWeight: '600',
+      color: colors.brand.primary,
+    },
+    // Native iOS Tab Bar
+    bottomNav: {
+      height: 54,
+      backgroundColor: colors.surface.tabBar,
+      borderTopWidth: 0.5,
+      borderColor: colors.surface.border,
+      flexDirection: 'row',
+      justifyContent: 'space-around',
+      alignItems: 'center',
+      paddingHorizontal: 8,
+    },
+    navBtn: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingVertical: 4,
+    },
+    navBtnLabel: {
+      fontSize: 10,
+      color: colors.text.muted,
+      fontWeight: '500',
+      marginTop: 3,
+    },
+    navBtnLabelActive: {
+      color: colors.brand.primary,
+      fontWeight: '600',
+    },
+  });

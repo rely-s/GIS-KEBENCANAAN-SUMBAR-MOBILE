@@ -1,8 +1,9 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Linking } from 'react-native';
 import * as WebBrowser from 'expo-web-browser';
 import { Map, ExternalLink, Layers, Phone } from 'lucide-react-native';
-import { colors } from '../theme/colors';
+import { useTheme } from '../theme/ThemeContext';
+import { ThemeColors } from '../theme/colors';
 
 interface WebMapHandoffProps {
   userLat: number;
@@ -15,6 +16,9 @@ export const WebMapHandoff: React.FC<WebMapHandoffProps> = ({
   userLon,
   webBaseUrl = 'http://127.0.0.1:5173',
 }) => {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+
   const handleOpenWebGIS = async () => {
     try {
       const fullUrl = `${webBaseUrl}/?view=mobile_lite&lat=${userLat}&lon=${userLon}&zoom=15&layer=posko,sesar`;
@@ -34,16 +38,17 @@ export const WebMapHandoff: React.FC<WebMapHandoffProps> = ({
 
   return (
     <View style={styles.container}>
+      {/* Web GIS Handoff Card */}
       <View style={styles.card}>
         <View style={styles.leftRow}>
           <View style={styles.iconCircle}>
-            <Map size={20} color={colors.brand.primary} />
+            <Map size={18} color={colors.brand.primary} />
           </View>
           <View style={{ flex: 1 }}>
             <View style={styles.badgeRow}>
               <Text style={styles.title}>Visualisasi Peta Lengkap</Text>
               <View style={styles.layerBadge}>
-                <Layers size={10} color="#38bdf8" />
+                <Layers size={10} color={colors.category.banjir} />
                 <Text style={styles.layerText}>Web GIS</Text>
               </View>
             </View>
@@ -56,26 +61,27 @@ export const WebMapHandoff: React.FC<WebMapHandoffProps> = ({
         <TouchableOpacity
           style={styles.openBtn}
           onPress={handleOpenWebGIS}
-          activeOpacity={0.85}
+          activeOpacity={0.8}
         >
-          <Text style={styles.openBtnText}>Buka Web GIS</Text>
-          <ExternalLink size={14} color="#ffffff" />
+          <Text style={styles.openBtnText}>Buka Web GIS Pusdalops</Text>
+          <ExternalLink size={13} color="#FFFFFF" />
         </TouchableOpacity>
       </View>
 
-      <View style={styles.cardRed}>
+      {/* Emergency Callout Card (Apple Emergency HIG) */}
+      <View style={styles.emergencyCard}>
         <View style={styles.rowBetween}>
           <View style={{ flex: 1, marginRight: 8 }}>
-            <Text style={styles.titleRed} numberOfLines={1}>Siaga Tanggap Bencana</Text>
-            <Text style={styles.descriptionRed} numberOfLines={1}>Operator Pusdalops BPBD Prov. Sumbar 24/7</Text>
+            <Text style={styles.emergencyTitle} numberOfLines={1}>Siaga Tanggap Darurat</Text>
+            <Text style={styles.emergencyDesc} numberOfLines={1}>Pusdalops BPBD Prov. Sumbar 24/7</Text>
           </View>
           <TouchableOpacity
             style={styles.callBtn}
             onPress={handleCallEmergency}
-            activeOpacity={0.85}
+            activeOpacity={0.8}
           >
-            <Phone size={14} color="#b91c1c" />
-            <Text style={styles.callBtnText}>Hubungi 112</Text>
+            <Phone size={12} color="#FFFFFF" />
+            <Text style={styles.callBtnText}>Panggil 112</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -83,18 +89,18 @@ export const WebMapHandoff: React.FC<WebMapHandoffProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemeColors) =>
+  StyleSheet.create({
   container: {
     marginVertical: 8,
-    gap: 10,
+    gap: 8,
   },
   card: {
-    backgroundColor: 'rgba(15, 23, 42, 0.95)',
-    borderRadius: 16,
+    backgroundColor: colors.surface.card, // Apple #1C1C1E
+    borderRadius: 14,
     padding: 14,
-    borderWidth: 1,
-    borderColor: '#334155',
-    elevation: 3,
+    borderWidth: 0.5,
+    borderColor: colors.surface.borderSubtle,
   },
   leftRow: {
     flexDirection: 'row',
@@ -103,14 +109,12 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   iconCircle: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
-    backgroundColor: '#1e293b',
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    backgroundColor: 'rgba(255, 159, 10, 0.12)',
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(249, 115, 22, 0.3)',
     flexShrink: 0,
   },
   badgeRow: {
@@ -120,48 +124,50 @@ const styles = StyleSheet.create({
     marginBottom: 3,
   },
   title: {
-    fontSize: 14,
-    fontWeight: '900',
-    color: '#ffffff',
+    fontSize: 13,
+    fontWeight: '600',
+    color: colors.text.primary,
   },
   layerBadge: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 3,
-    backgroundColor: 'rgba(56, 189, 248, 0.12)',
+    backgroundColor: 'rgba(10, 132, 255, 0.12)',
     paddingHorizontal: 6,
     paddingVertical: 2,
-    borderRadius: 5,
+    borderRadius: 4,
   },
   layerText: {
-    fontSize: 8.5,
-    fontWeight: '700',
-    color: '#38bdf8',
+    fontSize: 9,
+    fontWeight: '600',
+    color: colors.category.banjir,
   },
   description: {
     fontSize: 11.5,
-    color: '#94a3b8',
+    color: colors.text.secondary,
     lineHeight: 16,
   },
   openBtn: {
     flexDirection: 'row',
-    backgroundColor: '#ea580c',
-    borderRadius: 12,
-    paddingVertical: 10,
+    backgroundColor: colors.brand.primary,
+    borderRadius: 10,
+    paddingVertical: 9,
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
   },
   openBtnText: {
-    fontSize: 13,
-    fontWeight: '800',
+    fontSize: 12.5,
+    fontWeight: '600',
     color: '#ffffff',
   },
-  cardRed: {
-    backgroundColor: '#b91c1c',
-    borderRadius: 16,
-    padding: 14,
-    elevation: 3,
+  emergencyCard: {
+    backgroundColor: 'rgba(255, 69, 58, 0.08)',
+    borderRadius: 14,
+    paddingVertical: 11,
+    paddingHorizontal: 14,
+    borderWidth: 0.5,
+    borderColor: 'rgba(255, 69, 58, 0.25)',
   },
   rowBetween: {
     flexDirection: 'row',
@@ -169,29 +175,30 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     gap: 6,
   },
-  titleRed: {
-    fontSize: 14,
-    fontWeight: '900',
-    color: '#ffffff',
-    marginBottom: 2,
+  emergencyTitle: {
+    fontSize: 12.5,
+    fontWeight: '600',
+    color: colors.status.dangerText,
+    marginBottom: 1,
   },
-  descriptionRed: {
-    fontSize: 11,
-    color: '#fecaca',
+  emergencyDesc: {
+    fontSize: 10.5,
+    color: colors.text.secondary,
   },
   callBtn: {
     flexDirection: 'row',
-    backgroundColor: '#ffffff',
-    borderRadius: 10,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
+    backgroundColor: colors.status.dangerText, // Apple System Red #FF453A
+    borderRadius: 8,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
     alignItems: 'center',
-    gap: 5,
+    gap: 4,
     flexShrink: 0,
   },
   callBtnText: {
-    fontSize: 12,
-    fontWeight: '800',
-    color: '#b91c1c',
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#ffffff',
   },
 });
+

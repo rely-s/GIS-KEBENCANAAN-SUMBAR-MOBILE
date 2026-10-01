@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { Waves, Mountain, CloudRain, Activity, Home, Building2, Navigation, ChevronRight } from 'lucide-react-native';
-import { colors } from '../theme/colors';
+import { useTheme } from '../theme/ThemeContext';
+import { ThemeColors } from '../theme/colors';
 import { ThreatItem } from '../types';
 
 export interface FacilityRouteTarget {
@@ -36,6 +37,9 @@ export const DistanceGrid: React.FC<DistanceGridProps> = ({
   onOpenRoute,
   onSelectHazard,
 }) => {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+
   const getThreat = (type: string) => {
     return threats.find((item) => {
       if (type === 'tsunami') return item.type === 'tsunami' || (item as any).raw_type === 'megathrust';
@@ -49,9 +53,9 @@ export const DistanceGrid: React.FC<DistanceGridProps> = ({
   const findDist = (type: string, defaultKm: number) => {
     const t = getThreat(type);
     if (t && t.distance_km != null) {
-      return `${t.distance_km} KM`;
+      return `${t.distance_km} km`;
     }
-    return `${defaultKm} KM`;
+    return `${defaultKm} km`;
   };
 
   const findStatusInfo = (type: string) => {
@@ -66,39 +70,23 @@ export const DistanceGrid: React.FC<DistanceGridProps> = ({
     return { label: 'AMAN', color: colors.status.safeText, bg: colors.status.safeBg };
   };
 
-  const tsunamiStatus = findStatusInfo('tsunami');
-  const sesarStatus = findStatusInfo('sesar');
-  const galodoStatus = findStatusInfo('galodo');
-  const banjirStatus = findStatusInfo('banjir');
-
   return (
     <View style={styles.container}>
       <View style={styles.headerRow}>
-        <Text style={styles.sectionTitle}>ANALISIS JARAK ZONA ANCAMAN (GIS)</Text>
-        <Text style={styles.tagLive}></Text>
+        <Text style={styles.sectionTitle}>ANALISIS JARAK ZONA ANCAMAN</Text>
       </View>
 
-      {/* 4 Hazards Grid */}
+      {/* 4 Hazards 2x2 Grid */}
       <View style={styles.grid}>
         {/* Tsunami */}
         <View style={styles.card}>
           <View style={styles.cardTop}>
-            <View style={[styles.iconBox, { backgroundColor: 'rgba(6, 182, 212, 0.15)' }]}>
-              <Waves size={16} color={colors.category.tsunami} />
+            <View style={[styles.iconBox, { backgroundColor: 'rgba(100, 210, 255, 0.12)' }]}>
+              <Waves size={15} color={colors.category.tsunami} />
             </View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.hazardName}>Zona Tsunami</Text>
-            </View>
-            {/* Status parameter (AMAN/WASPADA) dicomment dulu */}
-            {/*
-            <View style={[styles.miniStatusBadge, { backgroundColor: tsunamiStatus.bg }]}>
-              <Text style={[styles.miniStatusText, { color: tsunamiStatus.color }]}>
-                {tsunamiStatus.label}
-              </Text>
-            </View>
-            */}
+            <Text style={styles.hazardName} numberOfLines={1}>Zona Tsunami</Text>
           </View>
-          <Text style={[styles.distValue, { color: colors.category.tsunami }]}>
+          <Text style={styles.distValue}>
             {findDist('tsunami', 1.9)}
           </Text>
           <Text style={styles.subtext}>Pesisir Padang</Text>
@@ -107,22 +95,12 @@ export const DistanceGrid: React.FC<DistanceGridProps> = ({
         {/* Sesar Semangko */}
         <View style={styles.card}>
           <View style={styles.cardTop}>
-            <View style={[styles.iconBox, { backgroundColor: 'rgba(168, 85, 247, 0.15)' }]}>
-              <Activity size={16} color={colors.category.sesar} />
+            <View style={[styles.iconBox, { backgroundColor: 'rgba(191, 90, 242, 0.12)' }]}>
+              <Activity size={15} color={colors.category.sesar} />
             </View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.hazardName}>Sesar Darat</Text>
-            </View>
-            {/* Status parameter (AMAN/WASPADA) dicomment dulu */}
-            {/*
-            <View style={[styles.miniStatusBadge, { backgroundColor: sesarStatus.bg }]}>
-              <Text style={[styles.miniStatusText, { color: sesarStatus.color }]}>
-                {sesarStatus.label}
-              </Text>
-            </View>
-            */}
+            <Text style={styles.hazardName} numberOfLines={1}>Sesar Darat</Text>
           </View>
-          <Text style={[styles.distValue, { color: colors.category.sesar }]}>
+          <Text style={styles.distValue}>
             {findDist('sesar', 36.0)}
           </Text>
           <Text style={styles.subtext}>Sianok / Semangko</Text>
@@ -131,22 +109,12 @@ export const DistanceGrid: React.FC<DistanceGridProps> = ({
         {/* Galodo Marapi */}
         <View style={styles.card}>
           <View style={styles.cardTop}>
-            <View style={[styles.iconBox, { backgroundColor: 'rgba(244, 63, 94, 0.15)' }]}>
-              <Mountain size={16} color={colors.category.galodo} />
+            <View style={[styles.iconBox, { backgroundColor: 'rgba(255, 69, 58, 0.12)' }]}>
+              <Mountain size={15} color={colors.category.galodo} />
             </View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.hazardName}>Lahar Galodo</Text>
-            </View>
-            {/* Status parameter (AMAN/WASPADA) dicomment dulu */}
-            {/*
-            <View style={[styles.miniStatusBadge, { backgroundColor: galodoStatus.bg }]}>
-              <Text style={[styles.miniStatusText, { color: galodoStatus.color }]}>
-                {galodoStatus.label}
-              </Text>
-            </View>
-            */}
+            <Text style={styles.hazardName} numberOfLines={1}>Lahar Galodo</Text>
           </View>
-          <Text style={[styles.distValue, { color: colors.category.galodo }]}>
+          <Text style={styles.distValue}>
             {findDist('galodo', 46.5)}
           </Text>
           <Text style={styles.subtext}>Hulu Batang Anai</Text>
@@ -155,33 +123,23 @@ export const DistanceGrid: React.FC<DistanceGridProps> = ({
         {/* Banjir DAS */}
         <View style={styles.card}>
           <View style={styles.cardTop}>
-            <View style={[styles.iconBox, { backgroundColor: 'rgba(56, 189, 248, 0.15)' }]}>
-              <CloudRain size={16} color={colors.category.banjir} />
+            <View style={[styles.iconBox, { backgroundColor: 'rgba(10, 132, 255, 0.12)' }]}>
+              <CloudRain size={15} color={colors.category.banjir} />
             </View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.hazardName}>Rawan Banjir</Text>
-            </View>
-            {/* Status parameter (AMAN/WASPADA) dicomment dulu */}
-            {/*
-            <View style={[styles.miniStatusBadge, { backgroundColor: banjirStatus.bg }]}>
-              <Text style={[styles.miniStatusText, { color: banjirStatus.color }]}>
-                {banjirStatus.label}
-              </Text>
-            </View>
-            */}
+            <Text style={styles.hazardName} numberOfLines={1}>Rawan Banjir</Text>
           </View>
-          <Text style={[styles.distValue, { color: colors.category.banjir }]}>
+          <Text style={styles.distValue}>
             {findDist('banjir', 5.5)}
           </Text>
           <Text style={styles.subtext}>DAS Batang Kuranji</Text>
         </View>
       </View>
 
-      {/* Fasilitas Evakuasi Terdekat: Posko Pengungsi & Shelter TES */}
-      <View style={styles.facilitySection}>
-        {/* Metric Posko Pengungsian Terdekat */}
+      {/* Fasilitas Evakuasi Terdekat: iOS Inset Grouped List */}
+      <View style={styles.groupedListContainer}>
+        {/* Row 1: Posko Pengungsian */}
         <TouchableOpacity
-          style={styles.poskoMetric}
+          style={styles.groupedRow}
           onPress={() =>
             onOpenRoute &&
             onOpenRoute(
@@ -192,33 +150,34 @@ export const DistanceGrid: React.FC<DistanceGridProps> = ({
               }
             )
           }
-          activeOpacity={0.8}
+          activeOpacity={0.7}
         >
-          <View style={styles.shelterLeft}>
-            <View style={[styles.shelterIcon, { backgroundColor: 'rgba(249, 115, 22, 0.15)' }]}>
-              <Building2 size={16} color={colors.brand.primary} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.shelterLabel}>Posko Pengungsian Terdekat</Text>
-              <Text style={styles.shelterName} numberOfLines={1}>
-                {poskoName || 'Posko Komando BPBD'}
-              </Text>
-            </View>
+          <View style={[styles.facilityIconCircle, { backgroundColor: 'rgba(255, 159, 10, 0.15)' }]}>
+            <Building2 size={16} color={colors.brand.primary} />
           </View>
-          <View style={styles.shelterRight}>
-            <Text style={[styles.shelterDist, { color: colors.brand.primary }]}>
-              {typeof nearestPoskoKm === 'number' ? nearestPoskoKm.toFixed(2) : nearestPoskoKm} KM
+          <View style={styles.facilityContent}>
+            <Text style={styles.facilityType}>Posko Pengungsian Terdekat</Text>
+            <Text style={styles.facilityName} numberOfLines={1}>
+              {poskoName || 'Posko Komando BPBD'}
             </Text>
-            <View style={styles.actionPillBtn}>
-              <Navigation size={10} color="#ffffff" />
-              <Text style={styles.actionPillText}>Pandu Rute</Text>
+          </View>
+          <View style={styles.facilityRight}>
+            <Text style={styles.facilityDist}>
+              {typeof nearestPoskoKm === 'number' ? nearestPoskoKm.toFixed(2) : nearestPoskoKm} km
+            </Text>
+            <View style={styles.routeBtn}>
+              <Navigation size={10} color="#FFFFFF" />
+              <Text style={styles.routeBtnText}>Rute</Text>
             </View>
           </View>
         </TouchableOpacity>
 
-        {/* Metric Shelter TES Terdekat */}
+        {/* Inset Hairline Divider */}
+        <View style={styles.insetDivider} />
+
+        {/* Row 2: Shelter TES */}
         <TouchableOpacity
-          style={styles.shelterMetric}
+          style={styles.groupedRow}
           onPress={() =>
             onOpenRoute &&
             onOpenRoute(
@@ -229,26 +188,24 @@ export const DistanceGrid: React.FC<DistanceGridProps> = ({
               }
             )
           }
-          activeOpacity={0.8}
+          activeOpacity={0.7}
         >
-          <View style={styles.shelterLeft}>
-            <View style={styles.shelterIcon}>
-              <Home size={16} color="#c084fc" />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.shelterLabel}>Shelter Vertikal TES Terdekat</Text>
-              <Text style={styles.shelterName} numberOfLines={1}>
-                {shelterName || 'TES Ulak Karang'}
-              </Text>
-            </View>
+          <View style={[styles.facilityIconCircle, { backgroundColor: 'rgba(191, 90, 242, 0.15)' }]}>
+            <Home size={16} color="#BF5AF2" />
           </View>
-          <View style={styles.shelterRight}>
-            <Text style={styles.shelterDist}>
-              {typeof nearestShelterKm === 'number' ? nearestShelterKm.toFixed(2) : nearestShelterKm} KM
+          <View style={styles.facilityContent}>
+            <Text style={styles.facilityType}>Shelter Vertikal TES Terdekat</Text>
+            <Text style={styles.facilityName} numberOfLines={1}>
+              {shelterName || 'TES Ulak Karang'}
             </Text>
-            <View style={[styles.actionPillBtn, { backgroundColor: '#9333ea' }]}>
-              <Navigation size={10} color="#ffffff" />
-              <Text style={styles.actionPillText}>Pandu Rute</Text>
+          </View>
+          <View style={styles.facilityRight}>
+            <Text style={styles.facilityDist}>
+              {typeof nearestShelterKm === 'number' ? nearestShelterKm.toFixed(2) : nearestShelterKm} km
+            </Text>
+            <View style={[styles.routeBtn, { backgroundColor: '#BF5AF2' }]}>
+              <Navigation size={10} color="#FFFFFF" />
+              <Text style={styles.routeBtnText}>Rute</Text>
             </View>
           </View>
         </TouchableOpacity>
@@ -257,7 +214,8 @@ export const DistanceGrid: React.FC<DistanceGridProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemeColors) =>
+  StyleSheet.create({
   container: {
     marginVertical: 6,
   },
@@ -290,134 +248,110 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     maxWidth: '49%',
     minWidth: 140,
-    backgroundColor: colors.surface.card,
+    backgroundColor: colors.surface.card, // Apple #1C1C1E
     borderRadius: 14,
-    paddingVertical: 10,
-    paddingHorizontal: 10,
-    borderWidth: 1,
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+    borderWidth: 0.5,
     borderColor: colors.surface.borderSubtle,
   },
   cardTop: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    marginBottom: 4,
+    gap: 8,
+    marginBottom: 6,
   },
   iconBox: {
     width: 26,
     height: 26,
-    borderRadius: 8,
+    borderRadius: 7,
     alignItems: 'center',
     justifyContent: 'center',
     flexShrink: 0,
   },
   hazardName: {
-    fontSize: 11,
-    fontWeight: '700',
+    fontSize: 12,
+    fontWeight: '600',
     color: colors.text.primary,
+    flex: 1,
   },
   distValue: {
-    fontSize: 16,
-    fontWeight: '900',
-    letterSpacing: -0.5,
+    fontSize: 18,
+    fontWeight: '700',
+    letterSpacing: -0.3,
+    color: colors.text.primary,
   },
   subtext: {
-    fontSize: 9,
-    color: colors.text.muted,
+    fontSize: 10.5,
+    color: colors.text.secondary,
     marginTop: 2,
-    flex: 1,
   },
-  facilitySection: {
-    marginTop: 8,
-    gap: 8,
-  },
-  poskoMetric: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    backgroundColor: 'rgba(249, 115, 22, 0.08)',
+  // iOS Inset Grouped List Styles
+  groupedListContainer: {
+    marginTop: 10,
+    backgroundColor: colors.surface.card, // Apple #1C1C1E
     borderRadius: 14,
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    borderWidth: 1,
-    borderColor: 'rgba(249, 115, 22, 0.25)',
+    borderWidth: 0.5,
+    borderColor: colors.surface.borderSubtle,
+    overflow: 'hidden',
   },
-  shelterMetric: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    backgroundColor: 'rgba(192, 132, 252, 0.1)',
-    borderRadius: 14,
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    borderWidth: 1,
-    borderColor: 'rgba(192, 132, 252, 0.25)',
-  },
-  shelterLeft: {
+  groupedRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    flex: 1,
-    marginRight: 6,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    gap: 12,
   },
-  shelterIcon: {
+  facilityIconCircle: {
     width: 32,
     height: 32,
     borderRadius: 8,
-    backgroundColor: 'rgba(192, 132, 252, 0.2)',
     alignItems: 'center',
     justifyContent: 'center',
     flexShrink: 0,
   },
-  shelterLabel: {
-    fontSize: 9.5,
-    color: '#e9d5ff',
+  facilityContent: {
+    flex: 1,
+  },
+  facilityType: {
+    fontSize: 10.5,
+    color: colors.text.secondary,
+    fontWeight: '500',
+    marginBottom: 2,
+  },
+  facilityName: {
+    fontSize: 13,
     fontWeight: '600',
+    color: colors.text.primary,
   },
-  shelterName: {
-    fontSize: 11.5,
-    fontWeight: '800',
-    color: '#ffffff',
-  },
-  shelterRight: {
+  facilityRight: {
     alignItems: 'flex-end',
     flexShrink: 0,
+    gap: 4,
   },
-  shelterDist: {
-    fontSize: 15,
-    fontWeight: '900',
-    color: '#c084fc',
-  },
-  shelterSafe: {
-    fontSize: 9,
+  facilityDist: {
+    fontSize: 13,
     fontWeight: '700',
-    color: colors.status.safeText,
+    color: colors.text.primary,
   },
-  miniStatusBadge: {
-    paddingHorizontal: 5,
-    paddingVertical: 1.5,
-    borderRadius: 5,
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexShrink: 0,
-  },
-  miniStatusText: {
-    fontSize: 8,
-    fontWeight: '800',
-  },
-  actionPillBtn: {
+  routeBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 3,
     backgroundColor: colors.brand.primary,
-    paddingHorizontal: 6,
-    paddingVertical: 3,
+    paddingHorizontal: 8,
+    paddingVertical: 3.5,
     borderRadius: 6,
-    marginTop: 2,
   },
-  actionPillText: {
-    fontSize: 8.5,
-    fontWeight: '800',
+  routeBtnText: {
+    fontSize: 9.5,
+    fontWeight: '700',
     color: '#ffffff',
   },
+  insetDivider: {
+    height: 0.5,
+    backgroundColor: colors.surface.border,
+    marginLeft: 58,
+  },
 });
+
