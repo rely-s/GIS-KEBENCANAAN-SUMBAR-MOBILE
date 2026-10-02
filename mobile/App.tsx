@@ -47,7 +47,7 @@ import { ReportModal } from './src/components/ReportModal';
 import { SosModal } from './src/components/SosModal';
 import { Toast } from './src/components/Toast';
 
-import { fetchProximityCheck, fetchShelters, calculateLocalHaversineKm, fetchEnvironmentalHealth } from './src/api/client';
+import { fetchProximityCheck, fetchShelters, calculateLocalHaversineKm, fetchEnvironmentalHealth, LAN_HOST } from './src/api/client';
 import { ProximityCheckResponse, PoskoResponse, LaporanRecord, EnvironmentalHealthResponse } from './src/types';
 
 export default function App() {
@@ -205,7 +205,7 @@ function MainApp() {
   // Handoff Pandu Rute Evakuasi ke Web GIS
   const handleOpenWebEvacuationRoute = async (target?: FacilityRouteTarget & { bencana?: string; poskoId?: number; jenis?: string }) => {
     try {
-      const webBaseUrl = Platform.OS === 'web' ? 'http://127.0.0.1:5173' : 'http://192.168.50.109:5173';
+      const webBaseUrl = Platform.OS === 'web' ? 'http://127.0.0.1:5173' : `http://${LAN_HOST}:5173`;
       const bencanaType = target?.bencana || 'tsunami';
       let url = `${webBaseUrl}/?view=mobile_lite&action=evakuasi&userLat=${userLat}&userLon=${userLon}&zoom=16&layer=poskoEvakuasi,jalanTerputus,zonaTsunami,shelterTes`;
 

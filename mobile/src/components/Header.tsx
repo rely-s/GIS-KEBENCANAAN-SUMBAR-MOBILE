@@ -23,85 +23,89 @@ export const Header: React.FC<HeaderProps> = ({
 
   return (
     <View style={styles.container}>
-      {/* Top Bar Brand */}
-      <View style={styles.topRow}>
-        <View style={styles.brandContainer}>
-          {/* Trio Logo: BPBD, Pemprov Sumbar, & UPI YPTK */}
-          <View style={styles.logosWrapper}>
-            <View style={styles.logoBox}>
-              <Image
-                source={require('../../assets/logo-bpbd.png')}
-                style={styles.logoImage}
-                resizeMode="contain"
-              />
+      {/* Top Bar Brand / Navbar */}
+      <View style={styles.navbar}>
+        <View style={styles.topRow}>
+          <View style={styles.brandContainer}>
+            {/* Trio Logo: BPBD, Pemprov Sumbar, & UPI YPTK */}
+            <View style={styles.logosWrapper}>
+              <View style={styles.logoBox}>
+                <Image
+                  source={require('../../assets/logo-bpbd.png')}
+                  style={styles.logoImage}
+                  resizeMode="contain"
+                />
+              </View>
+              <View style={styles.logoBox}>
+                <Image
+                  source={require('../../assets/logo-pemprov.png')}
+                  style={styles.logoImage}
+                  resizeMode="contain"
+                />
+              </View>
+              <View style={styles.logoBox}>
+                <Image
+                  source={require('../../assets/logo-upi.png')}
+                  style={styles.logoImage}
+                  resizeMode="contain"
+                />
+              </View>
             </View>
-            <View style={styles.logoBox}>
-              <Image
-                source={require('../../assets/logo-pemprov.png')}
-                style={styles.logoImage}
-                resizeMode="contain"
-              />
-            </View>
-            <View style={styles.logoBox}>
-              <Image
-                source={require('../../assets/logo-upi.png')}
-                style={styles.logoImage}
-                resizeMode="contain"
-              />
+            <View style={styles.brandTextContainer}>
+              <Text style={styles.brandTitle}>Siaga Sumbar</Text>
+              <Text style={styles.brandSubtitle} numberOfLines={1}>
+                Pemprov Sumbar • BPBD • UPI
+              </Text>
             </View>
           </View>
-          <View style={styles.brandTextContainer}>
-            <Text style={styles.brandTitle}>Siaga Sumbar</Text>
-            <Text style={styles.brandSubtitle} numberOfLines={1}>
-              Pemprov Sumbar • BPBD • UPI
-            </Text>
+
+          {/* Right Actions: Theme Switcher & SOS 112 */}
+          <View style={styles.topRightActions}>
+            <TouchableOpacity
+              style={styles.themeToggleBtn}
+              onPress={toggleTheme}
+              activeOpacity={0.7}
+              accessibilityLabel={isDark ? 'Ganti ke Mode Terang' : 'Ganti ke Mode Gelap'}
+            >
+              {isDark ? (
+                <Sun size={15} color={colors.text.primary} />
+              ) : (
+                <Moon size={15} color={colors.text.primary} />
+              )}
+            </TouchableOpacity>
+
+            <TouchableOpacity style={styles.sosButton} onPress={onOpenSos} activeOpacity={0.8}>
+              <PhoneCall size={13} color="#ffffff" style={{ marginRight: 4 }} />
+              <Text style={styles.sosText}>SOS 112</Text>
+            </TouchableOpacity>
           </View>
-        </View>
-
-        {/* Right Actions: Theme Switcher & SOS 112 */}
-        <View style={styles.topRightActions}>
-          <TouchableOpacity
-            style={styles.themeToggleBtn}
-            onPress={toggleTheme}
-            activeOpacity={0.7}
-            accessibilityLabel={isDark ? 'Ganti ke Mode Terang' : 'Ganti ke Mode Gelap'}
-          >
-            {isDark ? (
-              <Sun size={15} color={colors.text.primary} />
-            ) : (
-              <Moon size={15} color={colors.text.primary} />
-            )}
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.sosButton} onPress={onOpenSos} activeOpacity={0.8}>
-            <PhoneCall size={13} color="#ffffff" style={{ marginRight: 4 }} />
-            <Text style={styles.sosText}>SOS 112</Text>
-          </TouchableOpacity>
         </View>
       </View>
 
-      {/* Geolocation Card */}
-      <View style={styles.locationCard}>
-        <View style={styles.locationInfo}>
-          <View style={styles.pinCircle}>
-            <MapPin size={16} color="#0A84FF" />
+      {/* Geolocation Card (Diposisikan lebih ke bawah dari navbar dengan batas tipis) */}
+      <View style={styles.locationSection}>
+        <View style={styles.locationCard}>
+          <View style={styles.locationInfo}>
+            <View style={styles.pinCircle}>
+              <MapPin size={16} color="#0A84FF" />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.locationTitle}>Lokasi Koordinat Anda</Text>
+              <Text style={styles.locationText} numberOfLines={1}>
+                {isDetecting ? 'Mendeteksi satelit GPS...' : locationLabel}
+              </Text>
+            </View>
           </View>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.locationTitle}>Lokasi Koordinat Anda</Text>
-            <Text style={styles.locationText} numberOfLines={1}>
-              {isDetecting ? 'Mendeteksi satelit GPS...' : locationLabel}
-            </Text>
-          </View>
+          <TouchableOpacity
+            style={styles.refreshBtn}
+            onPress={onRefreshLocation}
+            disabled={isDetecting}
+            activeOpacity={0.7}
+          >
+            <RotateCw size={13} color={colors.brand.primary} />
+            <Text style={styles.refreshText}>{isDetecting ? '...' : 'Perbarui'}</Text>
+          </TouchableOpacity>
         </View>
-        <TouchableOpacity
-          style={styles.refreshBtn}
-          onPress={onRefreshLocation}
-          disabled={isDetecting}
-          activeOpacity={0.7}
-        >
-          <RotateCw size={13} color={colors.brand.primary} />
-          <Text style={styles.refreshText}>{isDetecting ? '...' : 'Perbarui'}</Text>
-        </TouchableOpacity>
       </View>
     </View>
   );
@@ -110,16 +114,25 @@ export const Header: React.FC<HeaderProps> = ({
 const createStyles = (colors: ThemeColors, isDark: boolean) =>
   StyleSheet.create({
     container: {
+      backgroundColor: colors.surface.canvas,
+    },
+    navbar: {
       paddingHorizontal: 16,
       paddingTop: 8,
-      paddingBottom: 6,
+      paddingBottom: 14,
+      borderBottomWidth: 1,
+      borderBottomColor: isDark ? 'rgba(255, 255, 255, 0.14)' : 'rgba(0, 0, 0, 0.08)',
       backgroundColor: colors.surface.canvas,
     },
     topRow: {
       flexDirection: 'row',
       justifyContent: 'space-between',
       alignItems: 'center',
-      marginBottom: 10,
+    },
+    locationSection: {
+      paddingHorizontal: 16,
+      paddingTop: 18, // Dibuat lebih ke bawah dari navbar
+      paddingBottom: 6,
     },
     brandContainer: {
       flexDirection: 'row',

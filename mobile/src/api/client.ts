@@ -9,7 +9,7 @@ import { Platform } from 'react-native';
 import { ProximityCheckResponse, PoskoResponse, LaporWargaPayload, EnvironmentalHealthResponse } from '../types';
 
 // IP Host LAN untuk koneksi Expo Go di perangkat fisik HP
-export const LAN_HOST = '192.168.50.109';
+export const LAN_HOST = '192.168.50.163';
 export const API_BASE_URL = Platform.OS === 'web'
   ? (typeof window !== 'undefined' && window.location.hostname === 'localhost' ? 'http://127.0.0.1:8000/api' : `http://${LAN_HOST}:8000/api`)
   : `http://${LAN_HOST}:8000/api`;
