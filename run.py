@@ -112,7 +112,7 @@ def check_system_requirements(root_dir: Path):
                 pg_data = cand
                 break
 
-        pg_log = (pg_data / "logfile.log") if pg_data else None
+        pg_log = root_dir / "pg_server.log"
         if pg_ctl and pg_data and pg_log:
             log_info(f"Mencoba menyalakan PostgreSQL GIS Instance ({pg_data.name}) dengan {pg_ctl.name}...")
             pid_file = pg_data / "postmaster.pid"
@@ -122,7 +122,7 @@ def check_system_requirements(root_dir: Path):
                         pid_file.unlink(missing_ok=True)
                 except Exception:
                     pass
-            subprocess.run([str(pg_ctl), "start", "-D", str(pg_data), "-l", str(pg_log), "-w", "-t", "15"], capture_output=True)
+            subprocess.run([str(pg_ctl), "start", "-D", str(pg_data), "-l", str(pg_log), "-w", "-t", "60"], capture_output=True)
             if is_port_open("127.0.0.1", db_port):
                 log_success(f"PostgreSQL GIS Instance berhasil dinyalakan di port {db_port}.")
             else:
@@ -152,6 +152,7 @@ def main():
     root_dir = Path(__file__).resolve().parent
     backend_dir = root_dir / "backend"
     frontend_dir = root_dir / "frontend"
+    mobile_dir = root_dir / "mobile"
 
     if not backend_dir.exists() or not frontend_dir.exists():
         log_error("Direktori 'backend' atau 'frontend' tidak ditemukan di root repositori.")
@@ -160,7 +161,7 @@ def main():
     check_system_requirements(root_dir)
     run_database_migrations(backend_dir)
 
-    log_info("Memulai server FastAPI Backend dan Vite Frontend...")
+    log_info("Memulai server FastAPI Backend, Vite Frontend, dan Expo Mobile...")
 
     # Jalankan Backend FastAPI (Port 8000)
     backend_cmd = [
@@ -176,7 +177,6 @@ def main():
     )
 
     # Jalankan Frontend Vite (Port 5173 terkonfigurasi di vite.config.ts)
-    # Di Windows, npm adalah npm.cmd
     npm_cmd = "npm.cmd" if os.name == "nt" else "npm"
     frontend_args = [npm_cmd, "run", "dev"]
     frontend_proc = subprocess.Popen(
@@ -185,12 +185,24 @@ def main():
         env=os.environ.copy()
     )
 
+    # Jalankan Mobile Expo (Port 8081 / Web & Expo Go)
+    mobile_proc = None
+    if mobile_dir.exists():
+        npx_cmd = "npx.cmd" if os.name == "nt" else "npx"
+        mobile_args = [npx_cmd, "expo", "start"]
+        mobile_proc = subprocess.Popen(
+            mobile_args,
+            cwd=str(mobile_dir),
+            env=os.environ.copy()
+        )
+
     log_success("Dashboard GIS Kebencanaan Sumatera Barat Berhasil Diluncurkan!")
     print(f"""
 {TermColor.GREEN}{TermColor.BOLD}--------------------------------------------------------------------------------
 [PORTAL APLIKASI UTAMA]
    - Dashboard GIS Web      : {TermColor.WHITE}http://127.0.0.1:5173/{TermColor.GREEN}
-   - Mobile App Web Preview : {TermColor.WHITE}http://localhost:8082/{TermColor.GREEN} (atau Expo Go: cd mobile; npx expo start)
+   - Mobile Web Preview     : {TermColor.WHITE}http://localhost:8081/{TermColor.GREEN}
+   - Mobile Expo Go (HP)    : {TermColor.WHITE}exp://192.168.50.163:8081{TermColor.GREEN} (Scan QR Code di terminal)
    - Backend API REST & Geo : {TermColor.WHITE}http://127.0.0.1:8000/{TermColor.GREEN}
    - Dokumentasi Swagger UI : {TermColor.WHITE}http://127.0.0.1:8000/docs{TermColor.GREEN}
 
@@ -207,6 +219,11 @@ def main():
     def shutdown_handler(sig, frame):
         log_info("Menerima sinyal terminasi. Mematikan seluruh proses anak...")
         try:
+            if mobile_proc and mobile_proc.poll() is None:
+                if os.name == 'nt':
+                    subprocess.run(["taskkill", "/F", "/T", "/PID", str(mobile_proc.pid)], capture_output=True)
+                else:
+                    mobile_proc.terminate()
             if frontend_proc.poll() is None:
                 if os.name == 'nt':
                     subprocess.run(["taskkill", "/F", "/T", "/PID", str(frontend_proc.pid)], capture_output=True)
@@ -233,6 +250,9 @@ def main():
                 shutdown_handler(None, None)
             if frontend_proc.poll() is not None:
                 log_error(f"Frontend Vite berhenti dengan kode keluar {frontend_proc.poll()}. Mematikan layanan.")
+                shutdown_handler(None, None)
+            if mobile_proc and mobile_proc.poll() is not None:
+                log_error(f"Mobile Expo berhenti dengan kode keluar {mobile_proc.poll()}. Mematikan layanan.")
                 shutdown_handler(None, None)
             time.sleep(1)
     except KeyboardInterrupt:

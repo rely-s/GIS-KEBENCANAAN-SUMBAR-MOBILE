@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Location from 'expo-location';
+import * as Haptics from 'expo-haptics';
 import {
   Home,
   Plus,
@@ -287,8 +288,24 @@ function MainApp() {
     return 1.25;
   }, [nearestPoskoFeature, userLat, userLon]);
 
+  const handleTabPress = (tab: 'beranda' | 'feed' | 'riwayat') => {
+    if (activeTab !== tab) {
+      try {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      } catch (_) {}
+      setActiveTab(tab);
+    }
+  };
+
+  const handleOpenReport = () => {
+    try {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    } catch (_) {}
+    setIsReportOpen(true);
+  };
+
   return (
-    <View style={[styles.safeArea, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
+    <View style={[styles.safeArea, { paddingTop: insets.top }]}>
       <StatusBar
         barStyle={isDark ? 'light-content' : 'dark-content'}
         backgroundColor={colors.surface.canvas}
@@ -560,17 +577,21 @@ function MainApp() {
       )}
 
       {/* Native iOS Tab Bar */}
-      <View style={[styles.bottomNav, { paddingBottom: Math.max(insets.bottom, 4) }]}>
+      <View style={[styles.bottomNav, { paddingBottom: Math.max(insets.bottom, 12) }]}>
         {/* Nav Beranda */}
         <TouchableOpacity
           style={styles.navBtn}
-          onPress={() => setActiveTab('beranda')}
-          activeOpacity={0.7}
+          onPress={() => handleTabPress('beranda')}
+          activeOpacity={0.6}
+          hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
         >
-          <Home
-            size={21}
-            color={activeTab === 'beranda' ? colors.brand.primary : colors.text.muted}
-          />
+          <View style={[styles.navIconWrapper, activeTab === 'beranda' && styles.navIconWrapperActive]}>
+            <Home
+              size={20}
+              color={activeTab === 'beranda' ? colors.brand.primary : colors.text.muted}
+              strokeWidth={activeTab === 'beranda' ? 2.4 : 1.9}
+            />
+          </View>
           <Text
             style={[
               styles.navBtnLabel,
@@ -584,34 +605,42 @@ function MainApp() {
         {/* Nav Data Riil */}
         <TouchableOpacity
           style={styles.navBtn}
-          onPress={() => setActiveTab('feed')}
-          activeOpacity={0.7}
+          onPress={() => handleTabPress('feed')}
+          activeOpacity={0.6}
+          hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
         >
-          <Radio
-            size={21}
-            color={activeTab === 'feed' ? colors.brand.primary : colors.text.muted}
-          />
+          <View style={[styles.navIconWrapper, activeTab === 'feed' && styles.navIconWrapperActive]}>
+            <Radio
+              size={20}
+              color={activeTab === 'feed' ? colors.brand.primary : colors.text.muted}
+              strokeWidth={activeTab === 'feed' ? 2.4 : 1.9}
+            />
+          </View>
           <Text
             style={[
               styles.navBtnLabel,
               activeTab === 'feed' && styles.navBtnLabelActive,
             ]}
           >
-            Informasi Data Bencana
+            Data Bencana
           </Text>
         </TouchableOpacity>
 
-        {/* Nav Lapor (iOS Clean Action Tab) */}
+        {/* Nav Lapor (iOS High-Priority Action Tab) */}
         <TouchableOpacity
-          style={styles.navBtn}
-          onPress={() => setIsReportOpen(true)}
+          style={styles.navBtnLapor}
+          onPress={handleOpenReport}
           activeOpacity={0.7}
+          hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
         >
-          <PlusCircle
-            size={21}
-            color={colors.text.muted}
-          />
-          <Text style={styles.navBtnLabel}>
+          <View style={styles.laporCircle}>
+            <Plus
+              size={18}
+              color="#ffffff"
+              strokeWidth={2.8}
+            />
+          </View>
+          <Text style={styles.navBtnLaporLabel}>
             Lapor
           </Text>
         </TouchableOpacity>
@@ -619,13 +648,17 @@ function MainApp() {
         {/* Nav Riwayat */}
         <TouchableOpacity
           style={styles.navBtn}
-          onPress={() => setActiveTab('riwayat')}
-          activeOpacity={0.7}
+          onPress={() => handleTabPress('riwayat')}
+          activeOpacity={0.6}
+          hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
         >
-          <FileText
-            size={21}
-            color={activeTab === 'riwayat' ? colors.brand.primary : colors.text.muted}
-          />
+          <View style={[styles.navIconWrapper, activeTab === 'riwayat' && styles.navIconWrapperActive]}>
+            <FileText
+              size={20}
+              color={activeTab === 'riwayat' ? colors.brand.primary : colors.text.muted}
+              strokeWidth={activeTab === 'riwayat' ? 2.4 : 1.9}
+            />
+          </View>
           <Text
             style={[
               styles.navBtnLabel,
@@ -682,7 +715,7 @@ const createStyles = (colors: ThemeColors, isDark: boolean) =>
     },
     scrollContent: {
       paddingHorizontal: 14,
-      paddingBottom: 24,
+      paddingBottom: 36,
     },
     tabContent: {
       paddingTop: 4,
@@ -1001,29 +1034,74 @@ const createStyles = (colors: ThemeColors, isDark: boolean) =>
     },
     // Native iOS Tab Bar
     bottomNav: {
-      height: 54,
       backgroundColor: colors.surface.tabBar,
-      borderTopWidth: 0.5,
+      borderTopWidth: StyleSheet.hairlineWidth,
       borderColor: colors.surface.border,
       flexDirection: 'row',
       justifyContent: 'space-around',
       alignItems: 'center',
-      paddingHorizontal: 8,
+      paddingTop: 8,
+      paddingHorizontal: 6,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: -3 },
+      shadowOpacity: isDark ? 0.35 : 0.07,
+      shadowRadius: 10,
+      elevation: 12,
     },
     navBtn: {
       flex: 1,
       alignItems: 'center',
       justifyContent: 'center',
+      paddingVertical: 3,
+      minHeight: 46,
+    },
+    navIconWrapper: {
+      paddingHorizontal: 12,
       paddingVertical: 4,
+      borderRadius: 16,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    navIconWrapperActive: {
+      backgroundColor: colors.brand.primaryFaint,
     },
     navBtnLabel: {
       fontFamily: FONTS.medium,
-      fontSize: 10,
+      fontSize: 10.5,
       color: colors.text.muted,
-      marginTop: 3,
+      marginTop: 2,
+      letterSpacing: -0.2,
     },
     navBtnLabelActive: {
       fontFamily: FONTS.bold,
       color: colors.brand.primary,
+    },
+    // Center Quick Action: Lapor
+    navBtnLapor: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingVertical: 2,
+      minHeight: 46,
+    },
+    laporCircle: {
+      width: 34,
+      height: 34,
+      borderRadius: 17,
+      backgroundColor: colors.brand.primary,
+      alignItems: 'center',
+      justifyContent: 'center',
+      shadowColor: colors.brand.primary,
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.35,
+      shadowRadius: 5,
+      elevation: 4,
+      marginBottom: 2,
+    },
+    navBtnLaporLabel: {
+      fontFamily: FONTS.bold,
+      fontSize: 10.5,
+      color: colors.brand.primary,
+      letterSpacing: -0.2,
     },
   });
