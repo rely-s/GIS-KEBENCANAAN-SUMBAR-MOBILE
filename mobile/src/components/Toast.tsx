@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, Animated } from 'react-native';
 import { CheckCircle2, AlertCircle } from 'lucide-react-native';
 import { useTheme } from '../theme/ThemeContext';
 import { ThemeColors } from '../theme/colors';
+import { FONTS } from '../theme/typography';
 
 interface ToastProps {
   visible: boolean;
@@ -104,12 +105,13 @@ const createStyles = (colors: ThemeColors, isDark: boolean) =>
       flex: 1,
     },
     title: {
+      fontFamily: FONTS.bold,
       fontSize: 12.5,
-      fontWeight: '600',
       color: colors.text.primary,
       marginBottom: 2,
     },
     message: {
+      fontFamily: FONTS.regular,
       fontSize: 11,
       color: colors.text.secondary,
       lineHeight: 15,

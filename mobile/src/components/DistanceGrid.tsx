@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { Waves, Mountain, CloudRain, Activity, Home, Building2, Navigation, ChevronRight } from 'lucide-react-native';
 import { useTheme } from '../theme/ThemeContext';
 import { ThemeColors } from '../theme/colors';
+import { FONTS } from '../theme/typography';
 import { ThreatItem } from '../types';
 
 export interface FacilityRouteTarget {
@@ -227,14 +228,15 @@ const createStyles = (colors: ThemeColors) =>
     paddingHorizontal: 2,
   },
   sectionTitle: {
+    fontFamily: FONTS.bold,
     fontSize: 11,
-    fontWeight: '800',
     color: colors.text.secondary,
-    letterSpacing: 0.5,
+    letterSpacing: 0.6,
+    textTransform: 'uppercase',
   },
   tagLive: {
+    fontFamily: FONTS.bold,
     fontSize: 10,
-    fontWeight: '700',
     color: colors.status.safeText,
   },
   grid: {
@@ -270,18 +272,19 @@ const createStyles = (colors: ThemeColors) =>
     flexShrink: 0,
   },
   hazardName: {
+    fontFamily: FONTS.semiBold,
     fontSize: 12,
-    fontWeight: '600',
     color: colors.text.primary,
     flex: 1,
   },
   distValue: {
+    fontFamily: FONTS.bold,
     fontSize: 18,
-    fontWeight: '700',
-    letterSpacing: -0.3,
+    letterSpacing: -0.4,
     color: colors.text.primary,
   },
   subtext: {
+    fontFamily: FONTS.regular,
     fontSize: 10.5,
     color: colors.text.secondary,
     marginTop: 2,
@@ -314,15 +317,16 @@ const createStyles = (colors: ThemeColors) =>
     flex: 1,
   },
   facilityType: {
+    fontFamily: FONTS.medium,
     fontSize: 10.5,
     color: colors.text.secondary,
-    fontWeight: '500',
     marginBottom: 2,
   },
   facilityName: {
+    fontFamily: FONTS.semiBold,
     fontSize: 13,
-    fontWeight: '600',
     color: colors.text.primary,
+    letterSpacing: -0.2,
   },
   facilityRight: {
     alignItems: 'flex-end',
@@ -330,8 +334,8 @@ const createStyles = (colors: ThemeColors) =>
     gap: 4,
   },
   facilityDist: {
+    fontFamily: FONTS.bold,
     fontSize: 13,
-    fontWeight: '700',
     color: colors.text.primary,
   },
   routeBtn: {
@@ -344,8 +348,8 @@ const createStyles = (colors: ThemeColors) =>
     borderRadius: 6,
   },
   routeBtnText: {
+    fontFamily: FONTS.bold,
     fontSize: 9.5,
-    fontWeight: '700',
     color: '#ffffff',
   },
   insetDivider: {

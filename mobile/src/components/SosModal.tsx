@@ -3,6 +3,7 @@ import { View, Text, Modal, TouchableOpacity, StyleSheet, Linking } from 'react-
 import { PhoneCall, X, Share2, Shield, HeartPulse } from 'lucide-react-native';
 import { useTheme } from '../theme/ThemeContext';
 import { ThemeColors } from '../theme/colors';
+import { FONTS } from '../theme/typography';
 
 interface SosModalProps {
   visible: boolean;
@@ -153,13 +154,15 @@ const createStyles = (colors: ThemeColors) =>
     borderColor: 'rgba(220, 38, 38, 0.3)',
   },
   title: {
+    fontFamily: FONTS.extraBold,
     fontSize: 16,
-    fontWeight: '900',
     color: colors.text.primary,
     marginBottom: 6,
     textAlign: 'center',
+    letterSpacing: -0.3,
   },
   subtitle: {
+    fontFamily: FONTS.regular,
     fontSize: 11.5,
     color: colors.text.secondary,
     textAlign: 'center',
@@ -180,13 +183,15 @@ const createStyles = (colors: ThemeColors) =>
     gap: 8,
   },
   btnTextWhite: {
+    fontFamily: FONTS.bold,
     fontSize: 12.5,
-    fontWeight: '800',
     color: '#ffffff',
+    letterSpacing: 0.1,
   },
   btnTextNeutral: {
+    fontFamily: FONTS.bold,
     fontSize: 12.5,
-    fontWeight: '800',
     color: colors.text.primary,
+    letterSpacing: 0.1,
   },
 });

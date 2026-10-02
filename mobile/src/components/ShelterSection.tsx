@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Linking } from 'react-native';
 import { Building2, Navigation, Phone, HeartPulse, CheckCircle2 } from 'lucide-react-native';
 import { colors } from '../theme/colors';
+import { FONTS } from '../theme/typography';
 import { PoskoFeature } from '../types';
 import { calculateLocalHaversineKm } from '../api/client';
 
@@ -248,14 +249,15 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   titleText: {
+    fontFamily: FONTS.bold,
     fontSize: 11,
-    fontWeight: '800',
     color: colors.text.secondary,
-    letterSpacing: 0.5,
+    letterSpacing: 0.6,
+    textTransform: 'uppercase',
   },
   badgeSiaga: {
+    fontFamily: FONTS.bold,
     fontSize: 9.5,
-    fontWeight: '700',
     color: colors.status.safeText,
     backgroundColor: 'rgba(16, 185, 129, 0.1)',
     paddingHorizontal: 8,
@@ -276,12 +278,14 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   tesName: {
-    fontSize: 13.5,
-    fontWeight: '800',
+    fontFamily: FONTS.bold,
+    fontSize: 14,
     color: colors.text.primary,
+    letterSpacing: -0.2,
     marginBottom: 2,
   },
   tesDetails: {
+    fontFamily: FONTS.regular,
     fontSize: 10.5,
     color: colors.text.secondary,
   },
@@ -294,8 +298,8 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(249, 115, 22, 0.3)',
   },
   distText: {
+    fontFamily: FONTS.bold,
     fontSize: 11,
-    fontWeight: '800',
     color: colors.brand.primary,
   },
   facilityRow: {
@@ -313,8 +317,8 @@ const styles = StyleSheet.create({
     gap: 5,
   },
   facilityText: {
+    fontFamily: FONTS.semiBold,
     fontSize: 10,
-    fontWeight: '600',
     color: colors.text.primary,
   },
   actionRow: {
@@ -330,8 +334,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   routeBtnText: {
+    fontFamily: FONTS.bold,
     fontSize: 11.5,
-    fontWeight: '700',
     color: '#ffffff',
   },
   poskoGrid: {
@@ -348,8 +352,8 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   poskoBadgeBpbd: {
+    fontFamily: FONTS.bold,
     fontSize: 9,
-    fontWeight: '800',
     color: '#f87171',
     backgroundColor: 'rgba(248, 113, 113, 0.15)',
     paddingHorizontal: 6,
@@ -359,8 +363,8 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   poskoBadgeMedis: {
+    fontFamily: FONTS.bold,
     fontSize: 9,
-    fontWeight: '800',
     color: '#38bdf8',
     backgroundColor: 'rgba(56, 189, 248, 0.15)',
     paddingHorizontal: 6,
@@ -370,12 +374,13 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   poskoTitle: {
+    fontFamily: FONTS.bold,
     fontSize: 11.5,
-    fontWeight: '700',
     color: colors.text.primary,
     minHeight: 32,
   },
   poskoMeta: {
+    fontFamily: FONTS.regular,
     fontSize: 10,
     color: colors.text.muted,
     marginTop: 2,
@@ -396,8 +401,8 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(249, 115, 22, 0.3)',
   },
   distTextMini: {
+    fontFamily: FONTS.bold,
     fontSize: 9,
-    fontWeight: '800',
     color: colors.brand.primary,
   },
   poskoActionCol: {
@@ -414,8 +419,8 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   routeBtnMiniText: {
+    fontFamily: FONTS.bold,
     fontSize: 10,
-    fontWeight: '700',
     color: '#ffffff',
   },
   callBtn: {
@@ -430,8 +435,8 @@ const styles = StyleSheet.create({
     borderColor: colors.surface.border,
   },
   callBtnText: {
+    fontFamily: FONTS.bold,
     fontSize: 10.5,
-    fontWeight: '700',
     color: colors.text.primary,
   },
 });

@@ -11,6 +11,7 @@ import {
 import { EnvironmentalHealthResponse } from '../types';
 import { useTheme } from '../theme/ThemeContext';
 import { ThemeColors } from '../theme/colors';
+import { FONTS } from '../theme/typography';
 
 interface EnvironmentalCardProps {
   data: EnvironmentalHealthResponse | null;
@@ -125,16 +126,16 @@ const createStyles = (colors: ThemeColors) =>
       gap: 6,
     },
     headerTitle: {
+      fontFamily: FONTS.bold,
       fontSize: 11,
-      fontWeight: '600',
       color: colors.text.secondary,
-      letterSpacing: 0.4,
+      letterSpacing: 0.5,
       textTransform: 'uppercase',
     },
     headerSubtitle: {
+      fontFamily: FONTS.medium,
       fontSize: 11,
       color: colors.text.muted,
-      fontWeight: '500',
       maxWidth: 160,
     },
     gridRow: {
@@ -154,24 +155,25 @@ const createStyles = (colors: ThemeColors) =>
       marginBottom: 6,
     },
     wellLabel: {
+      fontFamily: FONTS.semiBold,
       fontSize: 10.5,
-      fontWeight: '600',
       color: colors.text.secondary,
       letterSpacing: 0.2,
     },
     largeValue: {
+      fontFamily: FONTS.extraBold,
       fontSize: 28,
-      fontWeight: '700',
-      letterSpacing: -0.5,
+      letterSpacing: -0.6,
       marginBottom: 4,
     },
     wellDetail: {
+      fontFamily: FONTS.regular,
       fontSize: 11.5,
       color: colors.text.secondary,
     },
     boldText: {
+      fontFamily: FONTS.bold,
       color: colors.text.primary,
-      fontWeight: '600',
     },
     divider: {
       height: 0.5,
@@ -189,9 +191,9 @@ const createStyles = (colors: ThemeColors) =>
       gap: 5,
     },
     metaText: {
+      fontFamily: FONTS.medium,
       fontSize: 11.5,
       color: colors.text.secondary,
-      fontWeight: '500',
     },
   });
 

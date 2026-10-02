@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { ShieldCheck, AlertTriangle, Flame, CheckCircle } from 'lucide-react-native';
 import { ThreatStatus } from '../types';
+import { FONTS } from '../theme/typography';
 
 interface HeroStatusProps {
   status: ThreatStatus;
@@ -102,19 +103,19 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
   badgeLabel: {
+    fontFamily: FONTS.extraBold,
     fontSize: 18,
-    fontWeight: '900',
     color: '#ffffff',
-    letterSpacing: 0.6,
+    letterSpacing: 0.8,
     marginBottom: 5,
     textTransform: 'uppercase',
   },
   directiveText: {
+    fontFamily: FONTS.regular,
     fontSize: 11.5,
-    fontWeight: '400',
     textAlign: 'center',
-    lineHeight: 16.5,
-    opacity: 0.9,
+    lineHeight: 17,
+    opacity: 0.95,
     paddingHorizontal: 6,
   },
 });

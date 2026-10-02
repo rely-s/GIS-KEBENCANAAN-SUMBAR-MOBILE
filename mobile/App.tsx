@@ -27,8 +27,17 @@ import {
 } from 'lucide-react-native';
 
 import * as WebBrowser from 'expo-web-browser';
+import {
+  useFonts,
+  PlusJakartaSans_400Regular,
+  PlusJakartaSans_500Medium,
+  PlusJakartaSans_600SemiBold,
+  PlusJakartaSans_700Bold,
+  PlusJakartaSans_800ExtraBold,
+} from '@expo-google-fonts/plus-jakarta-sans';
 import { ThemeColors } from './src/theme/colors';
 import { ThemeProvider, useTheme } from './src/theme/ThemeContext';
+import { FONTS } from './src/theme/typography';
 import { Header } from './src/components/Header';
 import { HeroStatus } from './src/components/HeroStatus';
 import { EnvironmentalCard } from './src/components/EnvironmentalCard';
@@ -42,6 +51,22 @@ import { fetchProximityCheck, fetchShelters, calculateLocalHaversineKm, fetchEnv
 import { ProximityCheckResponse, PoskoResponse, LaporanRecord, EnvironmentalHealthResponse } from './src/types';
 
 export default function App() {
+  const [fontsLoaded] = useFonts({
+    PlusJakartaSans_400Regular,
+    PlusJakartaSans_500Medium,
+    PlusJakartaSans_600SemiBold,
+    PlusJakartaSans_700Bold,
+    PlusJakartaSans_800ExtraBold,
+  });
+
+  if (!fontsLoaded) {
+    return (
+      <View style={{ flex: 1, backgroundColor: '#000000', justifyContent: 'center', alignItems: 'center' }}>
+        <ActivityIndicator size="large" color="#FF9F0A" />
+      </View>
+    );
+  }
+
   return (
     <SafeAreaProvider>
       <ThemeProvider>
@@ -354,7 +379,7 @@ function MainApp() {
             <View style={styles.tabContent}>
               <View style={styles.feedHeader}>
                 <Text style={styles.feedTitle}>INFORMASI DATA </Text>
-                <Text style={styles.feedBadgeLive}>● Live Sync</Text>
+                <Text style={styles.feedBadgeLive}></Text>
               </View>
 
               {/* Indeks Kualitas Udara (ISPU) & Panas BMKG Alert */}
@@ -461,7 +486,7 @@ function MainApp() {
                   <Text style={styles.profileName}>Warga Siaga Mandiri</Text>
                   <Text style={styles.profileMeta}>Terintegrasi Satu Data Pusdalops BPBD</Text>
                   <View style={styles.profileStatusBadge}>
-                    <Text style={styles.profileStatusText}>● Akun Pelapor Aktif</Text>
+                    <Text style={styles.profileStatusText}> Akun Pelapor Aktif</Text>
                   </View>
                 </View>
               </View>
@@ -648,9 +673,9 @@ const createStyles = (colors: ThemeColors, isDark: boolean) =>
       gap: 12,
     },
     loadingText: {
+      fontFamily: FONTS.semiBold,
       fontSize: 12,
       color: colors.text.secondary,
-      fontWeight: '600',
     },
     mainScroll: {
       flex: 1,
@@ -673,12 +698,14 @@ const createStyles = (colors: ThemeColors, isDark: boolean) =>
       marginBottom: 6,
     },
     callBannerTitle: {
+      fontFamily: FONTS.bold,
       fontSize: 13,
-      fontWeight: '800',
       color: '#ffffff',
+      letterSpacing: -0.2,
     },
     callBannerSub: {
-      fontSize: 10,
+      fontFamily: FONTS.regular,
+      fontSize: 10.5,
       color: '#fecaca',
       marginTop: 1,
     },
@@ -692,8 +719,8 @@ const createStyles = (colors: ThemeColors, isDark: boolean) =>
       borderRadius: 12,
     },
     call112Text: {
+      fontFamily: FONTS.bold,
       fontSize: 11.5,
-      fontWeight: '800',
       color: '#dc2626',
     },
     // Feed Tab Styles
@@ -705,19 +732,20 @@ const createStyles = (colors: ThemeColors, isDark: boolean) =>
       paddingHorizontal: 2,
     },
     feedTitle: {
+      fontFamily: FONTS.bold,
       fontSize: 11,
-      fontWeight: '800',
       color: colors.text.secondary,
-      letterSpacing: 0.5,
+      letterSpacing: 0.6,
+      textTransform: 'uppercase',
     },
     feedBadgeLive: {
+      fontFamily: FONTS.bold,
       fontSize: 10,
-      fontWeight: '700',
       color: colors.status.safeText,
     },
     feedBadgeCount: {
+      fontFamily: FONTS.bold,
       fontSize: 10,
-      fontWeight: '700',
       color: colors.brand.primary,
     },
     feedCard: {
@@ -743,23 +771,25 @@ const createStyles = (colors: ThemeColors, isDark: boolean) =>
       borderRadius: 6,
     },
     badgePillText: {
+      fontFamily: FONTS.bold,
       fontSize: 10,
-      fontWeight: '700',
       letterSpacing: 0.3,
     },
     feedTime: {
+      fontFamily: FONTS.medium,
       fontSize: 10.5,
       color: colors.text.muted,
-      fontWeight: '500',
     },
     gempaTitle: {
+      fontFamily: FONTS.bold,
       fontSize: 14,
-      fontWeight: '700',
       color: colors.text.primary,
       marginBottom: 4,
-      lineHeight: 19,
+      lineHeight: 20,
+      letterSpacing: -0.2,
     },
     feedDesc: {
+      fontFamily: FONTS.regular,
       fontSize: 12,
       color: colors.text.secondary,
       lineHeight: 18,
@@ -774,10 +804,9 @@ const createStyles = (colors: ThemeColors, isDark: boolean) =>
       borderColor: colors.surface.border,
     },
     gempaCoord: {
+      fontFamily: FONTS.mono,
       fontSize: 10.5,
       color: colors.text.secondary,
-      fontWeight: '500',
-      fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
       flex: 1,
       marginRight: 6,
     },
@@ -788,8 +817,8 @@ const createStyles = (colors: ThemeColors, isDark: boolean) =>
       borderRadius: 6,
     },
     metaTagText: {
+      fontFamily: FONTS.bold,
       fontSize: 10,
-      fontWeight: '700',
     },
     // Profile & Reports Styles
     profileCard: {
@@ -814,16 +843,18 @@ const createStyles = (colors: ThemeColors, isDark: boolean) =>
       borderColor: colors.surface.border,
     },
     avatarText: {
+      fontFamily: FONTS.bold,
       fontSize: 15,
-      fontWeight: '700',
       color: colors.brand.primary,
     },
     profileName: {
+      fontFamily: FONTS.bold,
       fontSize: 13.5,
-      fontWeight: '600',
       color: colors.text.primary,
+      letterSpacing: -0.2,
     },
     profileMeta: {
+      fontFamily: FONTS.regular,
       fontSize: 10.5,
       color: colors.text.secondary,
       marginTop: 1,
@@ -837,8 +868,8 @@ const createStyles = (colors: ThemeColors, isDark: boolean) =>
       marginTop: 4,
     },
     profileStatusText: {
+      fontFamily: FONTS.semiBold,
       fontSize: 9.5,
-      fontWeight: '600',
       color: colors.status.safeText,
     },
     emptyReports: {
@@ -846,6 +877,7 @@ const createStyles = (colors: ThemeColors, isDark: boolean) =>
       alignItems: 'center',
     },
     emptyText: {
+      fontFamily: FONTS.medium,
       fontSize: 11.5,
       color: colors.text.muted,
     },
@@ -864,8 +896,8 @@ const createStyles = (colors: ThemeColors, isDark: boolean) =>
       marginBottom: 4,
     },
     reportItemType: {
-      fontSize: 12,
-      fontWeight: '600',
+      fontFamily: FONTS.bold,
+      fontSize: 12.5,
       color: colors.text.primary,
     },
     badgeStatusReport: {
@@ -875,16 +907,18 @@ const createStyles = (colors: ThemeColors, isDark: boolean) =>
       borderRadius: 4,
     },
     badgeStatusReportText: {
+      fontFamily: FONTS.semiBold,
       fontSize: 9,
-      fontWeight: '600',
       color: colors.status.warningText,
     },
     reportItemLoc: {
+      fontFamily: FONTS.medium,
       fontSize: 10.5,
       color: colors.brand.primary,
       marginBottom: 4,
     },
     reportItemDesc: {
+      fontFamily: FONTS.regular,
       fontSize: 11,
       color: colors.text.secondary,
       lineHeight: 15,
@@ -896,6 +930,7 @@ const createStyles = (colors: ThemeColors, isDark: boolean) =>
       marginTop: 8,
     },
     reportItemTime: {
+      fontFamily: FONTS.medium,
       fontSize: 9.5,
       color: colors.text.muted,
     },
@@ -941,11 +976,12 @@ const createStyles = (colors: ThemeColors, isDark: boolean) =>
       justifyContent: 'center',
     },
     themeTitle: {
+      fontFamily: FONTS.bold,
       fontSize: 12.5,
-      fontWeight: '600',
       color: colors.text.primary,
     },
     themeSubtitle: {
+      fontFamily: FONTS.regular,
       fontSize: 10.5,
       color: colors.text.secondary,
       marginTop: 1,
@@ -959,8 +995,8 @@ const createStyles = (colors: ThemeColors, isDark: boolean) =>
       borderColor: colors.surface.border,
     },
     toggleThemeBtnText: {
+      fontFamily: FONTS.bold,
       fontSize: 11,
-      fontWeight: '600',
       color: colors.brand.primary,
     },
     // Native iOS Tab Bar
@@ -981,13 +1017,13 @@ const createStyles = (colors: ThemeColors, isDark: boolean) =>
       paddingVertical: 4,
     },
     navBtnLabel: {
+      fontFamily: FONTS.medium,
       fontSize: 10,
       color: colors.text.muted,
-      fontWeight: '500',
       marginTop: 3,
     },
     navBtnLabelActive: {
+      fontFamily: FONTS.bold,
       color: colors.brand.primary,
-      fontWeight: '600',
     },
   });

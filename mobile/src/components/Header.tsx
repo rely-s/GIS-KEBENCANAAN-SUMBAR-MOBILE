@@ -3,6 +3,7 @@ import { View, Text, TouchableOpacity, StyleSheet, Image } from 'react-native';
 import { MapPin, RotateCw, PhoneCall, Sun, Moon } from 'lucide-react-native';
 import { useTheme } from '../theme/ThemeContext';
 import { ThemeColors } from '../theme/colors';
+import { FONTS } from '../theme/typography';
 
 interface HeaderProps {
   locationLabel: string;
@@ -152,15 +153,16 @@ const createStyles = (colors: ThemeColors, isDark: boolean) =>
       justifyContent: 'center',
     },
     brandTitle: {
+      fontFamily: FONTS.bold,
       fontSize: 15,
-      fontWeight: '700',
       color: colors.text.primary,
-      letterSpacing: -0.3,
+      letterSpacing: -0.4,
     },
     brandSubtitle: {
+      fontFamily: FONTS.medium,
       fontSize: 10,
-      fontWeight: '500',
       color: colors.text.secondary,
+      letterSpacing: 0.1,
     },
     topRightActions: {
       flexDirection: 'row',
@@ -188,10 +190,10 @@ const createStyles = (colors: ThemeColors, isDark: boolean) =>
       flexShrink: 0,
     },
     sosText: {
+      fontFamily: FONTS.bold,
       fontSize: 11,
-      fontWeight: '700',
       color: '#ffffff',
-      letterSpacing: 0.2,
+      letterSpacing: 0.3,
     },
     locationCard: {
       flexDirection: 'row',
@@ -221,13 +223,14 @@ const createStyles = (colors: ThemeColors, isDark: boolean) =>
       flexShrink: 0,
     },
     locationTitle: {
+      fontFamily: FONTS.medium,
       fontSize: 9.5,
       color: colors.text.secondary,
-      fontWeight: '500',
+      letterSpacing: 0.1,
     },
     locationText: {
+      fontFamily: FONTS.semiBold,
       fontSize: 12.5,
-      fontWeight: '600',
       color: colors.text.primary,
     },
     refreshBtn: {
@@ -241,8 +244,8 @@ const createStyles = (colors: ThemeColors, isDark: boolean) =>
       flexShrink: 0,
     },
     refreshText: {
+      fontFamily: FONTS.semiBold,
       fontSize: 10,
-      fontWeight: '600',
       color: colors.brand.primary,
     },
   });

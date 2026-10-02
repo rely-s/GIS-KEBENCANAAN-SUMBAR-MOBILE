@@ -4,6 +4,7 @@ import * as WebBrowser from 'expo-web-browser';
 import { Map, ExternalLink, Layers, Phone } from 'lucide-react-native';
 import { useTheme } from '../theme/ThemeContext';
 import { ThemeColors } from '../theme/colors';
+import { FONTS } from '../theme/typography';
 
 interface WebMapHandoffProps {
   userLat: number;
@@ -124,9 +125,10 @@ const createStyles = (colors: ThemeColors) =>
     marginBottom: 3,
   },
   title: {
+    fontFamily: FONTS.semiBold,
     fontSize: 13,
-    fontWeight: '600',
     color: colors.text.primary,
+    letterSpacing: -0.2,
   },
   layerBadge: {
     flexDirection: 'row',
@@ -138,11 +140,12 @@ const createStyles = (colors: ThemeColors) =>
     borderRadius: 4,
   },
   layerText: {
+    fontFamily: FONTS.bold,
     fontSize: 9,
-    fontWeight: '600',
     color: colors.category.banjir,
   },
   description: {
+    fontFamily: FONTS.regular,
     fontSize: 11.5,
     color: colors.text.secondary,
     lineHeight: 16,
@@ -157,8 +160,8 @@ const createStyles = (colors: ThemeColors) =>
     gap: 6,
   },
   openBtnText: {
+    fontFamily: FONTS.bold,
     fontSize: 12.5,
-    fontWeight: '600',
     color: '#ffffff',
   },
   emergencyCard: {
@@ -176,12 +179,13 @@ const createStyles = (colors: ThemeColors) =>
     gap: 6,
   },
   emergencyTitle: {
+    fontFamily: FONTS.bold,
     fontSize: 12.5,
-    fontWeight: '600',
     color: colors.status.dangerText,
     marginBottom: 1,
   },
   emergencyDesc: {
+    fontFamily: FONTS.regular,
     fontSize: 10.5,
     color: colors.text.secondary,
   },
@@ -196,8 +200,8 @@ const createStyles = (colors: ThemeColors) =>
     flexShrink: 0,
   },
   callBtnText: {
+    fontFamily: FONTS.bold,
     fontSize: 11,
-    fontWeight: '600',
     color: '#ffffff',
   },
 });
