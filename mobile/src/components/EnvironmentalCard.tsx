@@ -28,9 +28,9 @@ export const EnvironmentalCard: React.FC<EnvironmentalCardProps> = ({ data, isLo
         <View style={styles.headerRow}>
           <View style={styles.headerLeft}>
             <Activity size={13} color={colors.text.secondary} />
-            <Text style={styles.headerTitle}>KUALITAS UDARA & CUACA</Text>
+            <Text style={styles.headerTitle}>UDARA & CUACA</Text>
           </View>
-          <Text style={styles.headerSubtitle}>Memuat data BMKG...</Text>
+          <Text style={styles.headerSubtitle} numberOfLines={1}>Memuat BMKG...</Text>
         </View>
       </View>
     );
@@ -38,16 +38,25 @@ export const EnvironmentalCard: React.FC<EnvironmentalCardProps> = ({ data, isLo
 
   const { panas, kualitas_udara, lokasi } = data;
 
+  const stationName = useMemo(() => {
+    if (!lokasi?.stasiun_terdekat) return 'BMKG';
+    const clean = lokasi.stasiun_terdekat
+      .replace(/^Stasiun\s+(Meteorologi|Geofisika|Klimatologi|Pemantau\s+Atmosfer\s+Global|GAW)\s+/i, '')
+      .replace(/^BMKG\s+/i, '')
+      .trim();
+    return clean ? `BMKG ${clean.split(' ')[0]}` : 'BMKG';
+  }, [lokasi?.stasiun_terdekat]);
+
   return (
     <View style={styles.cardContainer}>
       {/* Apple Weather Header */}
       <View style={styles.headerRow}>
         <View style={styles.headerLeft}>
           <Wind size={13} color={colors.text.secondary} />
-          <Text style={styles.headerTitle}>KUALITAS UDARA & CUACA</Text>
+          <Text style={styles.headerTitle}>UDARA & CUACA</Text>
         </View>
-        <Text style={styles.headerSubtitle} numberOfLines={1}>
-          {lokasi?.stasiun_terdekat ? lokasi.stasiun_terdekat.replace('Stasiun Meteorologi ', '') : 'BMKG Minangkabau'}
+        <Text style={styles.headerSubtitle} numberOfLines={1} ellipsizeMode="tail">
+          {stationName}
         </Text>
       </View>
 
@@ -124,6 +133,7 @@ const createStyles = (colors: ThemeColors) =>
       flexDirection: 'row',
       alignItems: 'center',
       gap: 6,
+      flexShrink: 0,
     },
     headerTitle: {
       fontFamily: FONTS.bold,
@@ -136,7 +146,9 @@ const createStyles = (colors: ThemeColors) =>
       fontFamily: FONTS.medium,
       fontSize: 11,
       color: colors.text.muted,
-      maxWidth: 160,
+      flexShrink: 1,
+      textAlign: 'right',
+      marginLeft: 8,
     },
     gridRow: {
       flexDirection: 'row',
