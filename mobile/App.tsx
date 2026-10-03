@@ -65,6 +65,12 @@ import {
 } from './src/api/client';
 import { ProximityCheckResponse, PoskoResponse, LaporanRecord, EnvironmentalHealthResponse } from './src/types';
 
+import * as ExpoSplashScreen from 'expo-splash-screen';
+import { SplashScreen } from './src/components/SplashScreen';
+
+// Cegah native splash tertutup sebelum aplikasi siap
+ExpoSplashScreen.preventAutoHideAsync().catch(() => {});
+
 export default function App() {
   const [fontsLoaded] = useFonts({
     PlusJakartaSans_400Regular,
@@ -74,11 +80,17 @@ export default function App() {
     PlusJakartaSans_800ExtraBold,
   });
 
-  if (!fontsLoaded) {
+  const [isSplashFinished, setIsSplashFinished] = useState(false);
+
+  useEffect(() => {
+    if (fontsLoaded) {
+      ExpoSplashScreen.hideAsync().catch(() => {});
+    }
+  }, [fontsLoaded]);
+
+  if (!fontsLoaded || !isSplashFinished) {
     return (
-      <View style={{ flex: 1, backgroundColor: '#000000', justifyContent: 'center', alignItems: 'center' }}>
-        <ActivityIndicator size="large" color="#FF9F0A" />
-      </View>
+      <SplashScreen onFinish={() => setIsSplashFinished(true)} />
     );
   }
 

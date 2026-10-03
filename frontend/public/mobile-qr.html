@@ -1,11 +1,18 @@
 <!DOCTYPE html>
 <html lang="id">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Scan QR Siaga Sumbar Mobile - Expo Go</title>
   <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; }
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    }
+
     body {
       background: #0b0f19;
       color: #e2e8f0;
@@ -16,6 +23,7 @@
       justify-content: center;
       padding: 24px;
     }
+
     .card {
       background: #151d2e;
       border: 1px solid #1e293b;
@@ -26,6 +34,7 @@
       text-align: center;
       box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
     }
+
     .badge {
       display: inline-block;
       background: rgba(16, 185, 129, 0.15);
@@ -37,31 +46,36 @@
       margin-bottom: 16px;
       border: 1px solid rgba(16, 185, 129, 0.3);
     }
+
     h1 {
       font-size: 22px;
       font-weight: 700;
       color: #ffffff;
       margin-bottom: 8px;
     }
+
     p.sub {
       font-size: 14px;
       color: #94a3b8;
       margin-bottom: 24px;
     }
+
     .qr-wrapper {
       background: #ffffff;
       padding: 16px;
       border-radius: 16px;
       display: inline-block;
       margin-bottom: 24px;
-      box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
     }
+
     .qr-wrapper img {
       display: block;
       width: 260px;
       height: 260px;
       image-rendering: pixelated;
     }
+
     .url-box {
       background: #0f172a;
       border: 1px solid #334155;
@@ -74,6 +88,7 @@
       word-break: break-all;
       user-select: all;
     }
+
     .steps {
       text-align: left;
       background: rgba(30, 41, 59, 0.5);
@@ -83,39 +98,48 @@
       line-height: 1.6;
       color: #cbd5e1;
     }
+
     .steps ol {
       margin-left: 20px;
     }
+
     .steps li {
       margin-bottom: 6px;
     }
+
     .steps strong {
       color: #f8fafc;
     }
   </style>
 </head>
+
 <body>
   <div class="card">
     <div class="badge">● EXPO DEV SERVER AKTIF</div>
     <h1>Siaga Sumbar Mobile</h1>
     <p class="sub">Scan barcode di bawah dengan kamera HP atau Expo Go</p>
-    
+
     <div class="qr-wrapper">
       <img src="/expo_qr.png" alt="QR Code Expo Go">
     </div>
 
     <div class="url-box" id="expoUrl">exp://192.168.100.77:8081</div>
 
-    <a id="expoLink" href="exp://192.168.100.77:8081" style="display: block; background: #2563eb; color: #ffffff; text-decoration: none; padding: 14px 20px; border-radius: 12px; font-weight: 700; font-size: 15px; margin-bottom: 24px; box-shadow: 0 4px 15px rgba(37,99,235,0.4);">
+    <a id="expoLink" href="exp://192.168.100.77:8081"
+      style="display: block; background: #2563eb; color: #ffffff; text-decoration: none; padding: 14px 20px; border-radius: 12px; font-weight: 700; font-size: 15px; margin-bottom: 24px; box-shadow: 0 4px 15px rgba(37,99,235,0.4);">
       📱 Buka Langsung di Expo Go (Khusus iOS)
     </a>
 
     <div class="steps">
       <strong style="color:#38bdf8; display:block; margin-bottom:8px;">Petunjuk Khusus Pengguna iOS (iPhone):</strong>
       <ol>
-        <li>Di iOS, aplikasi Expo Go <strong>tidak memiliki tombol scan barcode di dalam aplikasinya</strong> (ketentuan resmi App Store Apple).</li>
-        <li><strong>Cara 1 (Kamera iPhone):</strong> Buka aplikasi <strong>Kamera bawaan iPhone</strong> &rarr; arahkan ke barcode di atas &rarr; ketuk balon kuning <strong>"Open in Expo Go"</strong>.</li>
-        <li><strong>Cara 2 (Safari iPhone):</strong> Buka halaman ini di Safari iPhone (<code id="safariUrl">http://192.168.100.77:5173/mobile-qr.html</code>) lalu ketuk tombol biru <strong>"Buka Langsung di Expo Go"</strong> di atas.</li>
+        <li>Di iOS, aplikasi Expo Go <strong>tidak memiliki tombol scan barcode di dalam aplikasinya</strong> (ketentuan
+          resmi App Store Apple).</li>
+        <li><strong>Cara 1 (Kamera iPhone):</strong> Buka aplikasi <strong>Kamera bawaan iPhone</strong> &rarr; arahkan
+          ke barcode di atas &rarr; ketuk balon kuning <strong>"Open in Expo Go"</strong>.</li>
+        <li><strong>Cara 2 (Safari iPhone):</strong> Buka halaman ini di Safari iPhone (<code
+            id="safariUrl">http://192.168.100.77:5173/mobile-qr.html</code>) lalu ketuk tombol biru <strong>"Buka
+            Langsung di Expo Go"</strong> di atas.</li>
       </ol>
     </div>
   </div>
@@ -129,4 +153,5 @@
     }
   </script>
 </body>
+
 </html>
