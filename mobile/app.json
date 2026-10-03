@@ -12,7 +12,8 @@
       "backgroundColor": "#EEF6FF"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.relyy.siagasumbar"
     },
     "android": {
       "package": "com.relyy.siagasumbar",
