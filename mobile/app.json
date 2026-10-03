@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "mobile",
-    "slug": "mobile",
+    "name": "Siaga Sumbar",
+    "slug": "siaga-sumbar",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -15,6 +15,7 @@
       "supportsTablet": true
     },
     "android": {
+      "package": "com.relyy.siagasumbar",
       "adaptiveIcon": {
         "backgroundColor": "#F8FAFC",
         "foregroundImage": "./assets/android-icon-foreground.png",
@@ -29,6 +30,11 @@
     "plugins": [
       "expo-web-browser",
       "expo-font"
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "94b0b9bb-4bbe-4ce8-9bc2-b478ce720aba"
+      }
+    }
   }
 }
