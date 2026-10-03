@@ -411,6 +411,7 @@ const createStyles = (colors: ThemeColors) =>
       borderColor: colors.surface.border,
       alignItems: 'center',
       justifyContent: 'center',
+      overflow: 'hidden',
     },
     urgencyBtnNormalActive: {
       backgroundColor: 'rgba(234, 179, 8, 0.15)',
@@ -449,6 +450,7 @@ const createStyles = (colors: ThemeColors) =>
       alignItems: 'center',
       justifyContent: 'center',
       gap: 6,
+      overflow: 'hidden',
     },
     photoActionText: {
       fontFamily: FONTS.semiBold,
@@ -465,6 +467,7 @@ const createStyles = (colors: ThemeColors) =>
       borderRadius: 8,
       borderWidth: 1,
       borderColor: 'rgba(255, 255, 255, 0.2)',
+      overflow: 'hidden',
     },
     retakeText: {
       fontFamily: FONTS.bold,
@@ -555,6 +558,7 @@ const createStyles = (colors: ThemeColors) =>
       borderRadius: 10,
       borderWidth: 1,
       borderColor: colors.surface.border,
+      overflow: 'hidden',
     },
     catChipActive: {
       backgroundColor: colors.brand.primary,

@@ -120,12 +120,12 @@
     <p class="sub">Scan barcode di bawah dengan kamera HP atau Expo Go</p>
 
     <div class="qr-wrapper">
-      <img src="/expo_qr.png" alt="QR Code Expo Go">
+      <img id="qrImg" src="https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=exp://192.168.100.38:8081" alt="QR Code Expo Go">
     </div>
 
-    <div class="url-box" id="expoUrl">exp://192.168.100.77:8081</div>
+    <div class="url-box" id="expoUrl">exp://192.168.100.38:8081</div>
 
-    <a id="expoLink" href="exp://192.168.100.77:8081"
+    <a id="expoLink" href="exp://192.168.100.38:8081"
       style="display: block; background: #2563eb; color: #ffffff; text-decoration: none; padding: 14px 20px; border-radius: 12px; font-weight: 700; font-size: 15px; margin-bottom: 24px; box-shadow: 0 4px 15px rgba(37,99,235,0.4);">
       📱 Buka Langsung di Expo Go (Khusus iOS)
     </a>
@@ -133,24 +133,18 @@
     <div class="steps">
       <strong style="color:#38bdf8; display:block; margin-bottom:8px;">Petunjuk Khusus Pengguna iOS (iPhone):</strong>
       <ol>
-        <li>Di iOS, aplikasi Expo Go <strong>tidak memiliki tombol scan barcode di dalam aplikasinya</strong> (ketentuan
-          resmi App Store Apple).</li>
-        <li><strong>Cara 1 (Kamera iPhone):</strong> Buka aplikasi <strong>Kamera bawaan iPhone</strong> &rarr; arahkan
-          ke barcode di atas &rarr; ketuk balon kuning <strong>"Open in Expo Go"</strong>.</li>
-        <li><strong>Cara 2 (Safari iPhone):</strong> Buka halaman ini di Safari iPhone (<code
-            id="safariUrl">http://192.168.100.77:5173/mobile-qr.html</code>) lalu ketuk tombol biru <strong>"Buka
-            Langsung di Expo Go"</strong> di atas.</li>
+        <li>Di iOS, aplikasi Expo Go <strong>tidak memiliki scanner barcode di dalam aplikasinya</strong> (ketentuan kebijakan App Store Apple).</li>
+        <li><strong>Cara 1 (Kamera iPhone):</strong> Buka aplikasi <strong>Kamera bawaan iPhone</strong> &rarr; arahkan ke barcode di atas &rarr; ketuk notifikasi/balon kuning <strong>"Open in Expo Go"</strong>.</li>
+        <li><strong>Cara 2 (Manual di Expo Go):</strong> Buka aplikasi <strong>Expo Go</strong> di iPhone &rarr; pilih <strong>"Enter URL manually"</strong> &rarr; ketik <code style="color:#38bdf8">exp://192.168.100.38:8081</code> &rarr; tekan Connect.</li>
       </ol>
     </div>
   </div>
   <script>
-    const host = window.location.hostname || '192.168.100.77';
-    if (host !== 'localhost' && host !== '127.0.0.1') {
-      const expoUri = 'exp://' + host + ':8081';
-      document.getElementById('expoUrl').innerText = expoUri;
-      document.getElementById('expoLink').href = expoUri;
-      document.getElementById('safariUrl').innerText = 'http://' + host + ':5173/mobile-qr.html';
-    }
+    const host = (window.location.hostname && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') ? window.location.hostname : '192.168.100.38';
+    const expoUri = 'exp://' + host + ':8081';
+    document.getElementById('expoUrl').innerText = expoUri;
+    document.getElementById('expoLink').href = expoUri;
+    document.getElementById('qrImg').src = 'https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=' + encodeURIComponent(expoUri);
   </script>
 </body>
 

@@ -40,6 +40,11 @@ import {
   PlusJakartaSans_700Bold,
   PlusJakartaSans_800ExtraBold,
 } from '@expo-google-fonts/plus-jakarta-sans';
+import {
+  Nunito_400Regular,
+  Nunito_900Black,
+} from '@expo-google-fonts/nunito';
+import { Asset } from 'expo-asset';
 import { ThemeColors } from './src/theme/colors';
 import { ThemeProvider, useTheme } from './src/theme/ThemeContext';
 import { FONTS } from './src/theme/typography';
@@ -66,32 +71,29 @@ import {
 import { ProximityCheckResponse, PoskoResponse, LaporanRecord, EnvironmentalHealthResponse } from './src/types';
 
 import * as ExpoSplashScreen from 'expo-splash-screen';
-import { SplashScreen } from './src/components/SplashScreen';
 
 // Cegah native splash tertutup sebelum aplikasi siap
 ExpoSplashScreen.preventAutoHideAsync().catch(() => {});
 
 export default function App() {
-  const [fontsLoaded] = useFonts({
+  const [fontsLoaded, fontError] = useFonts({
     PlusJakartaSans_400Regular,
     PlusJakartaSans_500Medium,
     PlusJakartaSans_600SemiBold,
     PlusJakartaSans_700Bold,
     PlusJakartaSans_800ExtraBold,
+    Nunito_400Regular,
+    Nunito_900Black,
   });
 
-  const [isSplashFinished, setIsSplashFinished] = useState(false);
-
   useEffect(() => {
-    if (fontsLoaded) {
+    if (fontsLoaded || fontError) {
       ExpoSplashScreen.hideAsync().catch(() => {});
     }
-  }, [fontsLoaded]);
+  }, [fontsLoaded, fontError]);
 
-  if (!fontsLoaded || !isSplashFinished) {
-    return (
-      <SplashScreen onFinish={() => setIsSplashFinished(true)} />
-    );
+  if (!fontsLoaded && !fontError) {
+    return null;
   }
 
   return (
@@ -103,7 +105,14 @@ export default function App() {
   );
 }
 
-function MainApp() {
+const appStyles = StyleSheet.create({
+  fullScreen: {
+    flex: 1,
+    backgroundColor: '#0B0F19',
+  },
+});
+
+function MainApp({ onReplayWelcome }: { onReplayWelcome?: () => void } = {}) {
   const insets = useSafeAreaInsets();
   const { theme, isDark, colors, toggleTheme } = useTheme();
   const styles = useMemo(() => createStyles(colors, isDark), [colors, isDark]);
@@ -474,11 +483,11 @@ function MainApp() {
                   <View style={styles.feedCardTop}>
                     <View style={[styles.badgePill, { backgroundColor: isDark ? 'rgba(100, 210, 255, 0.15)' : 'rgba(37, 99, 235, 0.12)' }]}>
                       <Activity size={12} color={isDark ? '#64D2FF' : '#1D4ED8'} />
-                      <Text style={[styles.badgePillText, { color: isDark ? '#64D2FF' : '#1D4ED8' }]}>
-                        KUALITAS UDARA & PANAS (BMKG)
+                      <Text style={[styles.badgePillText, { color: isDark ? '#64D2FF' : '#1D4ED8' }]} numberOfLines={1}>
+                        KUALITAS UDARA (BMKG)
                       </Text>
                     </View>
-                    <Text style={styles.feedTime}>Sensor Real-Time</Text>
+                    <Text style={styles.feedTime} numberOfLines={1}>Sensor Real-Time</Text>
                   </View>
                   <Text style={styles.gempaTitle}>
                     ISPU: {envData.kualitas_udara?.ispu_value ?? 48} ({envData.kualitas_udara?.kategori ?? 'Baik'}) • Suhu Terasa: {Math.round(envData.panas?.suhu_terasa_c ?? 32)}°C ({envData.panas?.kategori?.split(' ')[0] ?? 'Waspada'})
@@ -497,17 +506,19 @@ function MainApp() {
                     </View>
                   </View>
                 </View>
-              )}              {/* Gempa BMKG Alert Real-Time (InaTEWS) */}
+              )}
+
+              {/* Gempa BMKG Alert Real-Time (InaTEWS) */}
               {gempaData ? (
                 <View style={styles.feedCard}>
                   <View style={styles.feedCardTop}>
                     <View style={[styles.badgePill, { backgroundColor: isDark ? 'rgba(10, 132, 255, 0.15)' : 'rgba(2, 132, 199, 0.12)' }]}>
                       <Activity size={12} color={isDark ? '#64D2FF' : '#0369A1'} />
-                      <Text style={[styles.badgePillText, { color: isDark ? '#64D2FF' : '#0369A1' }]}>
-                        GEMPA TERKINI (BMKG INATEWS)
+                      <Text style={[styles.badgePillText, { color: isDark ? '#64D2FF' : '#0369A1' }]} numberOfLines={1}>
+                        GEMPA TERKINI (BMKG)
                       </Text>
                     </View>
-                    <Text style={styles.feedTime}>{gempaData.waktu_kejadian || 'Terkini'}</Text>
+                    <Text style={styles.feedTime} numberOfLines={1}>{gempaData.waktu_kejadian || 'Terkini'}</Text>
                   </View>
                   <Text style={styles.gempaTitle}>
                     M {gempaData.magnitude} — {gempaData.wilayah_teks || 'Pusat Gempa Terdeteksi'}
@@ -536,11 +547,11 @@ function MainApp() {
                     <View style={styles.feedCardTop}>
                       <View style={[styles.badgePill, { backgroundColor: isDark ? 'rgba(56, 189, 248, 0.15)' : 'rgba(14, 165, 233, 0.12)' }]}>
                         <CloudRain size={12} color={isDark ? '#38BDF8' : '#0284C7'} />
-                        <Text style={[styles.badgePillText, { color: isDark ? '#38BDF8' : '#0284C7' }]}>
-                          PRAKIRAAN CUACA (BMKG SUMBAR)
+                        <Text style={[styles.badgePillText, { color: isDark ? '#38BDF8' : '#0284C7' }]} numberOfLines={1}>
+                          PRAKIRAAN CUACA
                         </Text>
                       </View>
-                      <Text style={styles.feedTime}>{alert.area_desc || 'Sumbar'}</Text>
+                      <Text style={styles.feedTime} numberOfLines={1}>{alert.area_desc || 'Sumbar'}</Text>
                     </View>
                     <Text style={styles.gempaTitle}>{alert.event || alert.headline}</Text>
                     <Text style={styles.feedDesc}>{alert.description || alert.headline}</Text>
@@ -565,11 +576,11 @@ function MainApp() {
                     <View style={styles.feedCardTop}>
                       <View style={[styles.badgePill, { backgroundColor: isDark ? 'rgba(255, 69, 58, 0.15)' : 'rgba(220, 38, 38, 0.12)' }]}>
                         <AlertTriangle size={12} color={isDark ? '#FF453A' : '#B91C1C'} />
-                        <Text style={[styles.badgePillText, { color: isDark ? '#FF453A' : '#B91C1C' }]}>
-                          JALAN TERPUTUS (BLOKADE)
+                        <Text style={[styles.badgePillText, { color: isDark ? '#FF453A' : '#B91C1C' }]} numberOfLines={1}>
+                          JALAN TERPUTUS
                         </Text>
                       </View>
-                      <Text style={styles.feedTime}>{j.properties?.kab_kota || 'Sumbar'}</Text>
+                      <Text style={styles.feedTime} numberOfLines={1}>{j.properties?.kab_kota || 'Sumbar'}</Text>
                     </View>
                     <Text style={styles.gempaTitle}>{j.properties?.nama_ruas || j.properties?.nama || 'Ruas Jalan Terputus'}</Text>
                     <Text style={styles.feedDesc}>
@@ -743,6 +754,7 @@ function MainApp() {
             />
           </View>
           <Text
+            numberOfLines={1}
             style={[
               styles.navBtnLabel,
               activeTab === 'beranda' && styles.navBtnLabelActive,
@@ -767,6 +779,7 @@ function MainApp() {
             />
           </View>
           <Text
+            numberOfLines={1}
             style={[
               styles.navBtnLabel,
               activeTab === 'feed' && styles.navBtnLabelActive,
@@ -790,7 +803,7 @@ function MainApp() {
               strokeWidth={2.8}
             />
           </View>
-          <Text style={styles.navBtnLaporLabel}>
+          <Text style={styles.navBtnLaporLabel} numberOfLines={1}>
             Lapor
           </Text>
         </TouchableOpacity>
@@ -810,6 +823,7 @@ function MainApp() {
             />
           </View>
           <Text
+            numberOfLines={1}
             style={[
               styles.navBtnLabel,
               activeTab === 'riwayat' && styles.navBtnLabelActive,
@@ -967,24 +981,28 @@ const createStyles = (colors: ThemeColors, isDark: boolean) =>
       justifyContent: 'space-between',
       alignItems: 'center',
       marginBottom: 8,
+      gap: 6,
     },
     badgePill: {
       flexDirection: 'row',
       alignItems: 'center',
-      gap: 5,
-      paddingHorizontal: 8,
+      gap: 4,
+      paddingHorizontal: 7,
       paddingVertical: 3,
       borderRadius: 6,
+      flexShrink: 1,
     },
     badgePillText: {
       fontFamily: FONTS.bold,
-      fontSize: 10,
-      letterSpacing: 0.3,
+      fontSize: 9.5,
+      letterSpacing: 0.2,
     },
     feedTime: {
       fontFamily: FONTS.medium,
-      fontSize: 10.5,
+      fontSize: 10,
       color: colors.text.muted,
+      flexShrink: 0,
+      textAlign: 'right',
     },
     gempaTitle: {
       fontFamily: FONTS.bold,
@@ -1227,23 +1245,26 @@ const createStyles = (colors: ThemeColors, isDark: boolean) =>
       justifyContent: 'center',
       paddingVertical: 3,
       minHeight: 46,
+      borderRadius: 14,
     },
     navIconWrapper: {
-      paddingHorizontal: 12,
-      paddingVertical: 4,
-      borderRadius: 16,
+      width: 44,
+      height: 26,
+      borderRadius: 13,
       alignItems: 'center',
       justifyContent: 'center',
+      overflow: 'hidden',
     },
     navIconWrapperActive: {
       backgroundColor: colors.brand.primaryFaint,
     },
     navBtnLabel: {
       fontFamily: FONTS.medium,
-      fontSize: 10.5,
+      fontSize: 10,
       color: colors.text.muted,
       marginTop: 2,
-      letterSpacing: -0.2,
+      letterSpacing: -0.3,
+      textAlign: 'center',
     },
     navBtnLabelActive: {
       fontFamily: FONTS.bold,
