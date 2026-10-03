@@ -28,7 +28,7 @@ export const EnvironmentalCard: React.FC<EnvironmentalCardProps> = ({ data, isLo
         <View style={styles.headerRow}>
           <View style={styles.headerLeft}>
             <Activity size={13} color={colors.text.secondary} />
-            <Text style={styles.headerTitle}>UDARA & CUACA</Text>
+            <Text style={styles.headerTitle}>KUALITAS UDARA & CUACA</Text>
           </View>
           <Text style={styles.headerSubtitle} numberOfLines={1}>Memuat BMKG...</Text>
         </View>

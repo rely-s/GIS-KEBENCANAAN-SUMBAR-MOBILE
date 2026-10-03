@@ -73,7 +73,7 @@ export const ShelterSection: React.FC<ShelterSectionProps> = ({
 
   const handleCall = (phoneNumber: string | null) => {
     if (!phoneNumber) return;
-    Linking.openURL(`tel:${phoneNumber}`).catch(() => {});
+    Linking.openURL(`tel:${phoneNumber}`).catch(() => { });
   };
 
   return (
