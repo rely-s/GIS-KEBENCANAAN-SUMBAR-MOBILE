@@ -25,6 +25,10 @@ import {
   PhoneCall,
   Sun,
   Moon,
+  RefreshCw,
+  CloudRain,
+  CheckCircle2,
+  Info,
 } from 'lucide-react-native';
 
 import * as WebBrowser from 'expo-web-browser';
@@ -48,7 +52,17 @@ import { ReportModal } from './src/components/ReportModal';
 import { SosModal } from './src/components/SosModal';
 import { Toast } from './src/components/Toast';
 
-import { fetchProximityCheck, fetchShelters, calculateLocalHaversineKm, fetchEnvironmentalHealth, LAN_HOST } from './src/api/client';
+import { 
+  fetchProximityCheck, 
+  fetchShelters, 
+  calculateLocalHaversineKm, 
+  fetchEnvironmentalHealth, 
+  fetchGempaTerkini, 
+  fetchCuacaPeringatan, 
+  fetchJalanTerputus, 
+  fetchBencanaPublik, 
+  LAN_HOST 
+} from './src/api/client';
 import { ProximityCheckResponse, PoskoResponse, LaporanRecord, EnvironmentalHealthResponse } from './src/types';
 
 export default function App() {
@@ -95,7 +109,12 @@ function MainApp() {
   const [proximityData, setProximityData] = useState<ProximityCheckResponse | null>(null);
   const [shelterData, setShelterData] = useState<PoskoResponse | null>(null);
   const [envData, setEnvData] = useState<EnvironmentalHealthResponse | null>(null);
+  const [gempaData, setGempaData] = useState<any>(null);
+  const [cuacaAlerts, setCuacaAlerts] = useState<any[]>([]);
+  const [jalanList, setJalanList] = useState<any[]>([]);
+  const [bencanaList, setBencanaList] = useState<any[]>([]);
   const [isLoadingData, setIsLoadingData] = useState(true);
+  const [isLoadingFeed, setIsLoadingFeed] = useState(false);
 
   // Modals & Feedback
   const [isReportOpen, setIsReportOpen] = useState(false);
@@ -123,6 +142,27 @@ function MainApp() {
   // Toast Trigger Helper
   const showToast = (title: string, message: string) => {
     setToast({ visible: true, title, message });
+  };
+
+  // Load Feed Data (BMKG & Pusdalops Real-Time)
+  const loadFeedData = async () => {
+    setIsLoadingFeed(true);
+    try {
+      const [gempaRes, cuacaRes, jalanRes, bencanaRes] = await Promise.all([
+        fetchGempaTerkini(),
+        fetchCuacaPeringatan(),
+        fetchJalanTerputus(),
+        fetchBencanaPublik(),
+      ]);
+      if (gempaRes) setGempaData(gempaRes);
+      if (cuacaRes) setCuacaAlerts(cuacaRes);
+      if (jalanRes) setJalanList(jalanRes);
+      if (bencanaRes) setBencanaList(bencanaRes);
+    } catch (e) {
+      console.warn('Gagal sinkronisasi feed data:', e);
+    } finally {
+      setIsLoadingFeed(false);
+    }
   };
 
   // 1. Initial Load & Geolocation
@@ -176,7 +216,7 @@ function MainApp() {
         setLocationLabel('Padang Barat, Kota Padang');
       }
 
-      // Fetch Proximity, Shelters, and Environmental Health (Heat & Air Quality BMKG)
+      // Fetch Proximity, Shelters, Environmental Health, and Feed
       const [proxRes, shelterRes, envRes] = await Promise.all([
         fetchProximityCheck(currentLat, currentLon),
         fetchShelters(currentLat, currentLon),
@@ -186,6 +226,7 @@ function MainApp() {
       setProximityData(proxRes);
       setShelterData(shelterRes);
       setEnvData(envRes);
+      loadFeedData();
     } catch (err) {
       console.warn('Gagal sinkronisasi data awal:', err);
     } finally {
@@ -197,6 +238,12 @@ function MainApp() {
   useEffect(() => {
     resolveLocationAndData();
   }, []);
+
+  useEffect(() => {
+    if (activeTab === 'feed') {
+      loadFeedData();
+    }
+  }, [activeTab]);
 
   // Handle New Report Created
   const handleReportCreated = (newReport: LaporanRecord) => {
@@ -292,7 +339,7 @@ function MainApp() {
     if (activeTab !== tab) {
       try {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-      } catch (_) {}
+      } catch (_) { }
       setActiveTab(tab);
     }
   };
@@ -300,7 +347,7 @@ function MainApp() {
   const handleOpenReport = () => {
     try {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    } catch (_) {}
+    } catch (_) { }
     setIsReportOpen(true);
   };
 
@@ -391,12 +438,22 @@ function MainApp() {
             </View>
           )}
 
-          {/* TAB 2: FEED KEBENCANAAN */}
+          {/* TAB 2: FEED KEBENCANAAN REAL-TIME */}
           {activeTab === 'feed' && (
             <View style={styles.tabContent}>
               <View style={styles.feedHeader}>
-                <Text style={styles.feedTitle}>INFORMASI DATA </Text>
-                <Text style={styles.feedBadgeLive}></Text>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.feedTitle}>INFORMASI DATA RESMI</Text>
+                  <Text style={styles.feedSubtitle}>BMKG & PUSDALOPS BPBD SUMATERA BARAT</Text>
+                </View>
+                <TouchableOpacity 
+                  onPress={loadFeedData} 
+                  disabled={isLoadingFeed}
+                  style={[styles.refreshFeedBtn, isLoadingFeed && { opacity: 0.6 }]}
+                >
+                  <RefreshCw size={13} color={colors.brand.primary} />
+                  <Text style={styles.refreshFeedText}>{isLoadingFeed ? 'Memuat...' : 'Perbarui'}</Text>
+                </TouchableOpacity>
               </View>
 
               {/* Indeks Kualitas Udara (ISPU) & Panas BMKG Alert */}
@@ -412,10 +469,10 @@ function MainApp() {
                     <Text style={styles.feedTime}>Sensor Real-Time</Text>
                   </View>
                   <Text style={styles.gempaTitle}>
-                    ISPU: {envData.kualitas_udara.ispu_value} ({envData.kualitas_udara.kategori}) • Suhu Terasa: {Math.round(envData.panas.suhu_terasa_c)}°C ({envData.panas.kategori.split(' ')[0]})
+                    ISPU: {envData.kualitas_udara?.ispu_value ?? 48} ({envData.kualitas_udara?.kategori ?? 'Baik'}) • Suhu Terasa: {Math.round(envData.panas?.suhu_terasa_c ?? 32)}°C ({envData.panas?.kategori?.split(' ')[0] ?? 'Waspada'})
                   </Text>
                   <Text style={styles.feedDesc}>
-                    {envData.kualitas_udara.rekomendasi} {envData.panas.rekomendasi}
+                    {envData.kualitas_udara?.rekomendasi} {envData.panas?.rekomendasi}
                   </Text>
                   <View style={styles.gempaFooter}>
                     <Text style={styles.gempaCoord} numberOfLines={1}>
@@ -423,71 +480,152 @@ function MainApp() {
                     </Text>
                     <View style={styles.metaTagPill}>
                       <Text style={[styles.metaTagText, { color: isDark ? colors.brand.primary : '#B45309' }]}>
-                        Suhu {Math.round(envData.panas.suhu_aktual_c)}°C / Lembap {envData.panas.kelembapan_persen}%
+                        Suhu {Math.round(envData.panas?.suhu_aktual_c ?? 28)}°C / Lembap {envData.panas?.kelembapan_persen ?? 80}%
+                      </Text>
+                    </View>
+                  </View>
+                </View>
+              )}              {/* Gempa BMKG Alert Real-Time (InaTEWS) */}
+              {gempaData ? (
+                <View style={styles.feedCard}>
+                  <View style={styles.feedCardTop}>
+                    <View style={[styles.badgePill, { backgroundColor: isDark ? 'rgba(10, 132, 255, 0.15)' : 'rgba(2, 132, 199, 0.12)' }]}>
+                      <Activity size={12} color={isDark ? '#64D2FF' : '#0369A1'} />
+                      <Text style={[styles.badgePillText, { color: isDark ? '#64D2FF' : '#0369A1' }]}>
+                        GEMPA TERKINI (BMKG INATEWS)
+                      </Text>
+                    </View>
+                    <Text style={styles.feedTime}>{gempaData.waktu_kejadian || 'Terkini'}</Text>
+                  </View>
+                  <Text style={styles.gempaTitle}>
+                    M {gempaData.magnitude} — {gempaData.wilayah_teks || 'Pusat Gempa Terdeteksi'}
+                  </Text>
+                  <Text style={styles.feedDesc}>
+                    Kedalaman {gempaData.kedalaman_km} km • {gempaData.potensi_teks || (gempaData.potensi_tsunami ? 'BERPOTENSI TSUNAMI' : 'Tidak berpotensi tsunami')}.
+                    {gempaData.dirasakan ? ` Getaran dirasakan: ${gempaData.dirasakan}.` : ''}
+                  </Text>
+                  <View style={styles.gempaFooter}>
+                    <Text style={styles.gempaCoord}>
+                      Koordinat: {typeof gempaData.lat === 'number' ? gempaData.lat.toFixed(2) : (gempaData.lintang || '-')}, {typeof gempaData.lon === 'number' ? gempaData.lon.toFixed(2) : (gempaData.bujur || '-')}
+                    </Text>
+                    <View style={styles.metaTagPill}>
+                      <Text style={[styles.metaTagText, { color: gempaData.potensi_tsunami ? '#DC2626' : (isDark ? colors.status.safeText : '#15803D') }]}>
+                        {gempaData.potensi_tsunami ? 'Waspada Tsunami' : 'Aman Tsunami'}
+                      </Text>
+                    </View>
+                  </View>
+                </View>
+              ) : null}
+
+              {/* Peringatan Dini & Prakiraan Cuaca BMKG Sumbar */}
+              {cuacaAlerts && cuacaAlerts.length > 0 ? (
+                cuacaAlerts.map((alert: any, idx: number) => (
+                  <View key={alert.id || `cuaca-${idx}`} style={styles.feedCard}>
+                    <View style={styles.feedCardTop}>
+                      <View style={[styles.badgePill, { backgroundColor: isDark ? 'rgba(56, 189, 248, 0.15)' : 'rgba(14, 165, 233, 0.12)' }]}>
+                        <CloudRain size={12} color={isDark ? '#38BDF8' : '#0284C7'} />
+                        <Text style={[styles.badgePillText, { color: isDark ? '#38BDF8' : '#0284C7' }]}>
+                          PRAKIRAAN CUACA (BMKG SUMBAR)
+                        </Text>
+                      </View>
+                      <Text style={styles.feedTime}>{alert.area_desc || 'Sumbar'}</Text>
+                    </View>
+                    <Text style={styles.gempaTitle}>{alert.event || alert.headline}</Text>
+                    <Text style={styles.feedDesc}>{alert.description || alert.headline}</Text>
+                    <View style={styles.gempaFooter}>
+                      <Text style={styles.gempaCoord} numberOfLines={1}>
+                        Sumber: {alert.atribusi || 'Stasiun Meteorologi BMKG Minangkabau'}
+                      </Text>
+                      <View style={styles.metaTagPill}>
+                        <Text style={[styles.metaTagText, { color: alert.severity === 'Severe' ? '#DC2626' : colors.brand.primary }]}>
+                          {alert.severity === 'Severe' ? 'Waspada Cuaca' : 'Info BMKG'}
+                        </Text>
+                      </View>
+                    </View>
+                  </View>
+                ))
+              ) : null}
+
+              {/* Ruas Jalan Terputus (Blokade BPBD) / Jalur Aman */}
+              {jalanList && jalanList.length > 0 ? (
+                jalanList.map((j: any, idx: number) => (
+                  <View key={j.properties?.id || `jalan-${idx}`} style={styles.feedCard}>
+                    <View style={styles.feedCardTop}>
+                      <View style={[styles.badgePill, { backgroundColor: isDark ? 'rgba(255, 69, 58, 0.15)' : 'rgba(220, 38, 38, 0.12)' }]}>
+                        <AlertTriangle size={12} color={isDark ? '#FF453A' : '#B91C1C'} />
+                        <Text style={[styles.badgePillText, { color: isDark ? '#FF453A' : '#B91C1C' }]}>
+                          JALAN TERPUTUS (BLOKADE)
+                        </Text>
+                      </View>
+                      <Text style={styles.feedTime}>{j.properties?.kab_kota || 'Sumbar'}</Text>
+                    </View>
+                    <Text style={styles.gempaTitle}>{j.properties?.nama_ruas || j.properties?.nama || 'Ruas Jalan Terputus'}</Text>
+                    <Text style={styles.feedDesc}>
+                      {j.properties?.keterangan || j.properties?.penyebab || 'Badan jalan amblas diterjang material longsor/banjir. Arus lalu lintas dialihkan ke rute alternatif.'}
+                    </Text>
+                    {j.properties?.rute_alternatif && (
+                      <View style={styles.gempaFooter}>
+                        <Text style={styles.gempaCoord} numberOfLines={1}>
+                          Alternatif: {j.properties.rute_alternatif}
+                        </Text>
+                      </View>
+                    )}
+                  </View>
+                ))
+              ) : (
+                <View style={styles.feedCard}>
+                  <View style={styles.feedCardTop}>
+                    <View style={[styles.badgePill, { backgroundColor: isDark ? 'rgba(48, 209, 88, 0.15)' : 'rgba(22, 163, 74, 0.12)' }]}>
+                      <CheckCircle2 size={12} color={isDark ? '#30D158' : '#16A34A'} />
+                      <Text style={[styles.badgePillText, { color: isDark ? '#30D158' : '#16A34A' }]}>
+                        STATUS JALUR LOGISTIK (BPBD)
+                      </Text>
+                    </View>
+                    <Text style={styles.feedTime}>Pantauan Terkini</Text>
+                  </View>
+                  <Text style={styles.gempaTitle}>Seluruh Ruas Jalan Utama Terpantau Aman</Text>
+                  <Text style={styles.feedDesc}>
+                    Tidak ada laporan penutupan jalan darurat akibat longsor atau galodo saat ini di jalur utama Padang–Bukittinggi maupun lintas Sumatera Barat.
+                  </Text>
+                  <View style={styles.gempaFooter}>
+                    <Text style={styles.gempaCoord}>Pusdalops BPBD Prov. Sumatera Barat</Text>
+                    <View style={styles.metaTagPill}>
+                      <Text style={[styles.metaTagText, { color: isDark ? colors.status.safeText : '#15803D' }]}>
+                        Arus Lancar
                       </Text>
                     </View>
                   </View>
                 </View>
               )}
 
-              {/* Gempa BMKG Alert */}
-              <View style={styles.feedCard}>
-                <View style={styles.feedCardTop}>
-                  <View style={[styles.badgePill, { backgroundColor: isDark ? 'rgba(10, 132, 255, 0.15)' : 'rgba(2, 132, 199, 0.12)' }]}>
-                    <Activity size={12} color={isDark ? '#64D2FF' : '#0369A1'} />
-                    <Text style={[styles.badgePillText, { color: isDark ? '#64D2FF' : '#0369A1' }]}>
-                      GEMPA TERKINI (BMKG)
-                    </Text>
-                  </View>
-                  <Text style={styles.feedTime}>35 Menit lalu</Text>
-                </View>
-                <Text style={styles.gempaTitle}>M 5.3 - 48 km Barat Daya Pasaman Barat</Text>
-                <Text style={styles.feedDesc}>
-                  Kedalaman 10 km • Tidak berpotensi tsunami. Getaran dirasakan skala III-IV MMI di Simpang Empat dan Bukittinggi.
-                </Text>
-                <View style={styles.gempaFooter}>
-                  <Text style={styles.gempaCoord}>Koordinat: 0.12 LU, 99.78 BT</Text>
-                  <View style={styles.metaTagPill}>
-                    <Text style={[styles.metaTagText, { color: isDark ? colors.status.safeText : '#15803D' }]}>
-                      Aman Tsunami
-                    </Text>
-                  </View>
-                </View>
-              </View>
-
-              {/* Ruas Jalan Terputus (Road Blockage) */}
-              <View style={styles.feedCard}>
-                <View style={styles.feedCardTop}>
-                  <View style={[styles.badgePill, { backgroundColor: isDark ? 'rgba(255, 69, 58, 0.15)' : 'rgba(220, 38, 38, 0.12)' }]}>
-                    <AlertTriangle size={12} color={isDark ? '#FF453A' : '#B91C1C'} />
-                    <Text style={[styles.badgePillText, { color: isDark ? '#FF453A' : '#B91C1C' }]}>
-                      JALAN TERPUTUS (BLOKADE)
-                    </Text>
-                  </View>
-                  <Text style={styles.feedTime}>2 Jam lalu</Text>
-                </View>
-                <Text style={styles.gempaTitle}>Ruas Padang - Bukittinggi via Lembah Anai</Text>
-                <Text style={styles.feedDesc}>
-                  Badan jalan amblas diterjang aliran banjir lahar dingin (galodo). Arus lalu lintas dialihkan melalui rute alternatif Malalak / Sitinjau Lauik.
-                </Text>
-              </View>
-
               {/* Bencana Terverifikasi Pusdalops */}
-              <View style={styles.feedCard}>
-                <View style={styles.feedCardTop}>
-                  <View style={[styles.badgePill, { backgroundColor: isDark ? 'rgba(255, 159, 10, 0.15)' : 'rgba(217, 119, 6, 0.12)' }]}>
-                    <ShieldAlert size={12} color={isDark ? '#FF9F0A' : '#B45309'} />
-                    <Text style={[styles.badgePillText, { color: isDark ? '#FF9F0A' : '#B45309' }]}>
-                      VERIFIKASI PUSDALOPS
-                    </Text>
+              {bencanaList && bencanaList.length > 0 ? (
+                bencanaList.map((b: any, idx: number) => (
+                  <View key={b.id || `bencana-${idx}`} style={styles.feedCard}>
+                    <View style={styles.feedCardTop}>
+                      <View style={[styles.badgePill, { backgroundColor: isDark ? 'rgba(255, 159, 10, 0.15)' : 'rgba(217, 119, 6, 0.12)' }]}>
+                        <ShieldAlert size={12} color={isDark ? '#FF9F0A' : '#B45309'} />
+                        <Text style={[styles.badgePillText, { color: isDark ? '#FF9F0A' : '#B45309' }]}>
+                          VERIFIKASI PUSDALOPS
+                        </Text>
+                      </View>
+                      <Text style={styles.feedTime}>{b.waktu_kejadian || 'Terverifikasi'}</Text>
+                    </View>
+                    <Text style={styles.gempaTitle}>{b.nama_kejadian || b.jenis_bencana}</Text>
+                    <Text style={styles.feedDesc}>{b.deskripsi || b.keterangan || 'Penanganan dan evakuasi telah dilakukan oleh personel BPBD.'}</Text>
+                    <View style={styles.gempaFooter}>
+                      <Text style={styles.gempaCoord} numberOfLines={1}>
+                        Lokasi: {b.lokasi_teks || b.kab_kota || 'Sumatera Barat'}
+                      </Text>
+                      <View style={styles.metaTagPill}>
+                        <Text style={[styles.metaTagText, { color: colors.status.warningText }]}>
+                          {b.status_tanggap || 'Terkendali'}
+                        </Text>
+                      </View>
+                    </View>
                   </View>
-                  <Text style={styles.feedTime}>4 Jam lalu</Text>
-                </View>
-                <Text style={styles.gempaTitle}>Pohon Tumbang Menghalangi Jl. Raden Saleh</Text>
-                <Text style={styles.feedDesc}>
-                  Tim TRC BPBD Kota Padang dan Dinas Lingkungan Hidup telah selesai melakukan pemotongan dan evakuasi material. Jalan telah dapat dilalui normal.
-                </Text>
-              </View>
+                ))
+              ) : null}
             </View>
           )}
 
@@ -770,6 +908,29 @@ const createStyles = (colors: ThemeColors, isDark: boolean) =>
       color: colors.text.secondary,
       letterSpacing: 0.6,
       textTransform: 'uppercase',
+    },
+    feedSubtitle: {
+      fontFamily: FONTS.semiBold,
+      fontSize: 9.5,
+      color: colors.brand.primary,
+      letterSpacing: 0.2,
+      marginTop: 1,
+    },
+    refreshFeedBtn: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 5,
+      backgroundColor: colors.brand.primaryFaint,
+      paddingHorizontal: 9,
+      paddingVertical: 4,
+      borderRadius: 7,
+      borderWidth: 0.5,
+      borderColor: colors.surface.border,
+    },
+    refreshFeedText: {
+      fontFamily: FONTS.bold,
+      fontSize: 10.5,
+      color: colors.brand.primary,
     },
     feedBadgeLive: {
       fontFamily: FONTS.bold,

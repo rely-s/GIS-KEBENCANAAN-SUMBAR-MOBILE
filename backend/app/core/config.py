@@ -46,6 +46,18 @@ class Settings(BaseSettings):
     BMKG_GEMPATERKINI_URL: str = "https://data.bmkg.go.id/DataMKG/TEWS/gempaterkini.json"
     BMKG_GEMPADIRASAKAN_URL: str = "https://data.bmkg.go.id/DataMKG/TEWS/gempadirasakan.json"
 
+    # AccuWeather Real-Time Weather & Air Quality API
+    ACCUWEATHER_API_KEY: str = Field(default="", alias="ACCUWEATHER_API_KEY")
+
+    # IQAir AirVisual Community & Enterprise API Key
+    IQAIR_API_KEY: str = Field(default="", alias="IQAIR_API_KEY")
+
+    # WAQI (World Air Quality Index - aqicn.org) API Key / Token
+    WAQI_API_KEY: str = Field(default="", alias="WAQI_API_KEY")
+
+    # OpenWeatherMap API Key
+    OPENWEATHER_API_KEY: str = Field(default="", alias="OPENWEATHER_API_KEY")
+
     @property
     def sync_database_url(self) -> str:
         return f"postgresql://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}@{self.POSTGRES_SERVER}:{self.POSTGRES_PORT}/{self.POSTGRES_DB}"

@@ -9,9 +9,13 @@ import { Platform } from 'react-native';
 import { ProximityCheckResponse, PoskoResponse, LaporWargaPayload, EnvironmentalHealthResponse } from '../types';
 
 // IP Host LAN untuk koneksi Expo Go di perangkat fisik HP
-export const LAN_HOST = '192.168.50.163';
+export const LAN_HOST = '192.168.100.77';
 export const API_BASE_URL = Platform.OS === 'web'
-  ? (typeof window !== 'undefined' && window.location.hostname === 'localhost' ? 'http://127.0.0.1:8000/api' : `http://${LAN_HOST}:8000/api`)
+  ? (typeof window !== 'undefined' && window.location.hostname
+      ? (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+          ? 'http://127.0.0.1:8000/api'
+          : `http://${window.location.hostname}:8000/api`)
+      : `http://${LAN_HOST}:8000/api`)
   : `http://${LAN_HOST}:8000/api`;
 
 export const apiClient = axios.create({
@@ -257,45 +261,95 @@ export async function fetchStatusLaporan(bencanaId: number | string): Promise<an
 }
 
 /**
- * Live Feed: Peringatan Gempa Terkini BMKG
+ * Live Feed: Peringatan Gempa Terkini Real-Time BMKG (InaTEWS)
  */
 export async function fetchGempaTerkini(): Promise<any> {
   try {
     const res = await apiClient.get('/eksternal/gempa-terkini');
-    return res.data?.data || null;
+    if (res.data?.data) {
+      return res.data.data;
+    }
   } catch (err) {
-    // Fallback data gempa jika offline
-    return {
-      id: 999,
-      magnitude: 5.3,
-      kedalaman_km: 10,
-      wilayah_teks: '48 km Barat Daya Pasaman Barat',
-      waktu_kejadian: new Date().toISOString(),
-      potensi_tsunami: false,
-      dirasakan: true,
-      atribusi: 'BMKG (Data Cadangan Offline)',
-    };
+    // Lanjutkan ke direct fetch BMKG Open Data jika backend lokal belum siap
   }
+
+  try {
+    // Ambil langsung dari Server Open Data Resmi BMKG InaTEWS
+    const directBmkg = await axios.get('https://data.bmkg.go.id/DataMKG/TEWS/autogempa.json', { timeout: 6000 });
+    const g = directBmkg.data?.Infogempa?.gempa;
+    if (g) {
+      const coords = (g.Coordinates || '').split(',');
+      const lat = coords[0] ? parseFloat(coords[0].trim()) : 0;
+      const lon = coords[1] ? parseFloat(coords[1].trim()) : 0;
+      const mag = parseFloat(g.Magnitude || '0');
+      const depth = parseFloat((g.Kedalaman || '').replace('km', '').trim() || '0');
+      const potensiText = g.Potensi || 'Tidak berpotensi tsunami';
+      const isTsunami = potensiText.toLowerCase().includes('berpotensi tsunami');
+
+      return {
+        id: 'bmkg-realtime-' + (g.DateTime || Date.now()),
+        magnitude: mag,
+        kedalaman_km: depth,
+        lat,
+        lon,
+        lintang: g.Lintang,
+        bujur: g.Bujur,
+        wilayah_teks: g.Wilayah || 'Pusat Gempa Terdeteksi',
+        waktu_kejadian: `${g.Tanggal} • ${g.Jam}`,
+        potensi_tsunami: isTsunami,
+        potensi_teks: potensiText,
+        dirasakan: g.Dirasakan || null,
+        shakemap_url: g.Shakemap ? `https://data.bmkg.go.id/DataMKG/TEWS/${g.Shakemap}` : null,
+        atribusi: 'BMKG Indonesia (Pusat Gempa Nasional / InaTEWS)',
+      };
+    }
+  } catch (directErr) {
+    console.warn('[BMKG Direct Fetch Warning]', directErr);
+  }
+
+  return null;
 }
 
 /**
- * Live Feed: Peringatan Dini Cuaca Ekstrem BMKG
+ * Live Feed: Peringatan Dini & Prakiraan Cuaca BMKG Sumbar
  */
 export async function fetchCuacaPeringatan(): Promise<any[]> {
   try {
     const res = await apiClient.get('/eksternal/cuaca-peringatan');
-    return res.data?.data || res.data || [];
+    const items = res.data?.data || res.data;
+    if (Array.isArray(items) && items.length > 0) {
+      return items;
+    }
   } catch (err) {
-    return [
-      {
-        id: 991,
-        event: 'Peringatan Dini Cuaca Sumbar',
-        headline: 'Waspada potensi hujan sedang-lebat disertai petir di Padang Pariaman, Pesisir Selatan, Agam.',
-        area_desc: 'Sumatera Barat',
-        severity: 'Moderate',
-      },
-    ];
+    // Lanjutkan ke direct fetch BMKG Weather jika backend lokal belum siap
   }
+
+  try {
+    // Ambil langsung prakiraan cuaca digital resmi BMKG (Kota Padang adm4: 13.71.01.1001)
+    const resp = await axios.get('https://api.bmkg.go.id/publik/prakiraan-cuaca?adm4=13.71.01.1001', { timeout: 6000 });
+    const weatherBlocks = resp.data?.data?.[0]?.cuaca || [];
+    const flatCuaca = weatherBlocks.flat();
+    if (flatCuaca.length > 0) {
+      const nowC = flatCuaca[0];
+      const isSevere = (nowC.tp && nowC.tp >= 5) || (nowC.weather_desc && (nowC.weather_desc.toLowerCase().includes('petir') || nowC.weather_desc.toLowerCase().includes('lebat')));
+      return [
+        {
+          id: 'bmkg-cuaca-live-padang',
+          event: `Prakiraan Cuaca Resmi BMKG (${nowC.weather_desc || 'Terkini'})`,
+          headline: `Wilayah Kota Padang: ${nowC.weather_desc}, Suhu ${nowC.t}°C, Kelembaban ${nowC.hu}%, Angin ${nowC.ws} km/jam arah ${nowC.wd}. Presipitasi ${nowC.tp || 0} mm/jam.`,
+          description: `Analisis Stasiun Meteorologi Minangkabau BMKG untuk wilayah pesisir barat Sumatera Barat. Tetap waspada terhadap perubahan cuaca mendadak saat beraktivitas di luar ruangan.`,
+          area_desc: 'Kota Padang & Wilayah Pesisir Barat Sumbar',
+          severity: isSevere ? 'Severe' : 'Moderate',
+          effective: nowC.local_datetime || new Date().toISOString(),
+          atribusi: 'Stasiun Meteorologi BMKG Minangkabau',
+        },
+      ];
+    }
+  } catch (weatherErr) {
+    console.warn('[BMKG Weather Direct Fetch Warning]', weatherErr);
+  }
+
+  return [];
 }
 
 /**

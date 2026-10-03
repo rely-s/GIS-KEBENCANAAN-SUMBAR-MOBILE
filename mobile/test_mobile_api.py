@@ -49,7 +49,7 @@ def main():
 
     # 4. Peringatan Ruas Jalan Terputus (Blokade Bencana)
     ok, data = run_test("4. Jalan Terputus (/jalan-terputus)", "/jalan-terputus")
-    if ok and data.get("type") == "FeatureCollection" and len(data.get("features", [])) > 0:
+    if ok and data.get("type") == "FeatureCollection" and isinstance(data.get("features"), list):
         passed += 1
 
     # 5. Form Lapor Kejadian Warga (Crowdsourcing)

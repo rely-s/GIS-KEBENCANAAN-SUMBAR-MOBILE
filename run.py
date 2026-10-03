@@ -11,6 +11,11 @@ Menjalankan seluruh subsistem dalam satu perintah:
 
 import sys
 import os
+
+if sys.stdout and hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(line_buffering=True)
+if sys.stderr and hasattr(sys.stderr, "reconfigure"):
+    sys.stderr.reconfigure(line_buffering=True)
 import time
 import socket
 import signal
@@ -56,6 +61,15 @@ def is_port_open(host: str, port: int, timeout: float = 1.5) -> bool:
         sock.settimeout(timeout)
         result = sock.connect_ex((host, port))
         return result == 0
+
+def get_local_ip() -> str:
+    """Deteksi IP LAN lokal mesin secara otomatis."""
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+            s.connect(("8.8.8.8", 80))
+            return s.getsockname()[0]
+    except Exception:
+        return "127.0.0.1"
 
 def check_system_requirements(root_dir: Path):
     """Validasi versi Python, Node.js, npm, dan PostgreSQL port 5433."""
@@ -122,7 +136,7 @@ def check_system_requirements(root_dir: Path):
                         pid_file.unlink(missing_ok=True)
                 except Exception:
                     pass
-            subprocess.run([str(pg_ctl), "start", "-D", str(pg_data), "-l", str(pg_log), "-w", "-t", "60"], capture_output=True)
+            subprocess.run([str(pg_ctl), "start", "-D", str(pg_data), "-l", str(pg_log), "-w", "-t", "30"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             if is_port_open("127.0.0.1", db_port):
                 log_success(f"PostgreSQL GIS Instance berhasil dinyalakan di port {db_port}.")
             else:
@@ -138,12 +152,27 @@ def run_database_migrations(backend_dir: Path):
             [sys.executable, "-m", "alembic", "upgrade", "head"],
             cwd=str(backend_dir),
             capture_output=True,
-            text=True
+            text=True,
+            timeout=30
         )
         if res.returncode == 0:
             log_success("Skema database PostGIS telah mutakhir (head).")
         else:
             log_warn(f"Alembic migration notice: {res.stderr.strip() or res.stdout.strip()}")
+        
+        # Pastikan fungsi mock PostGIS terpasang jika ekstensi native tidak tersedia
+        mock_sql = backend_dir.parent / "mock_postgis.sql"
+        if mock_sql.exists():
+            try:
+                import psycopg2
+                conn = psycopg2.connect("postgresql://postgres:postgres@127.0.0.1:5433/gis_sumbar")
+                cur = conn.cursor()
+                cur.execute(mock_sql.read_text(encoding="utf-8"))
+                conn.commit()
+                cur.close()
+                conn.close()
+            except Exception:
+                pass
     except Exception as e:
         log_warn(f"Tidak dapat mengeksekusi alembic otomatis: {e}")
 
@@ -166,7 +195,7 @@ def main():
     # Jalankan Backend FastAPI (Port 8000)
     backend_cmd = [
         sys.executable, "-m", "uvicorn", "app.main:app",
-        "--host", "127.0.0.1",
+        "--host", "0.0.0.0",
         "--port", "8000",
         "--reload"
     ]
@@ -196,13 +225,15 @@ def main():
             env=os.environ.copy()
         )
 
+    local_ip = get_local_ip()
     log_success("Dashboard GIS Kebencanaan Sumatera Barat Berhasil Diluncurkan!")
     print(f"""
 {TermColor.GREEN}{TermColor.BOLD}--------------------------------------------------------------------------------
 [PORTAL APLIKASI UTAMA]
-   - Dashboard GIS Web      : {TermColor.WHITE}http://127.0.0.1:5173/{TermColor.GREEN}
+   - Dashboard GIS Web      : {TermColor.WHITE}http://127.0.0.1:5173/{TermColor.GREEN} (atau http://{local_ip}:5173/)
    - Mobile Web Preview     : {TermColor.WHITE}http://localhost:8081/{TermColor.GREEN}
-   - Mobile Expo Go (HP)    : {TermColor.WHITE}exp://192.168.50.163:8081{TermColor.GREEN} (Scan QR Code di terminal)
+   - Mobile Expo Go (HP)    : {TermColor.WHITE}exp://{local_ip}:8081{TermColor.GREEN} (Scan QR Code di terminal)
+   - Mobile QR Info Page    : {TermColor.WHITE}http://127.0.0.1:5173/mobile-qr.html{TermColor.GREEN}
    - Backend API REST & Geo : {TermColor.WHITE}http://127.0.0.1:8000/{TermColor.GREEN}
    - Dokumentasi Swagger UI : {TermColor.WHITE}http://127.0.0.1:8000/docs{TermColor.GREEN}
 

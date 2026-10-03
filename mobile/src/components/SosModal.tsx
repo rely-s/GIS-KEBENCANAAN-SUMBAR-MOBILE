@@ -29,7 +29,7 @@ export const SosModal: React.FC<SosModalProps> = ({
 
   const shareCoordinates = () => {
     const textMsg = encodeURIComponent(
-      `🚨 SOS KONDISI DARURAT! Posisi koordinat saya saat ini: https://maps.google.com/?q=${userLat},${userLon} (${userLat.toFixed(5)}, ${userLon.toFixed(5)}). Mohon bantuan evakuasi BPBD/SAR!`
+      `SOS KONDISI DARURAT! Posisi koordinat saya saat ini: https://maps.google.com/?q=${userLat},${userLon} (${userLat.toFixed(5)}, ${userLon.toFixed(5)}). Mohon bantuan evakuasi BPBD/SAR!`
     );
     Linking.openURL(`https://wa.me/?text=${textMsg}`).catch(() => {
       onShowToast('Berhasil Menyalin', 'Teks koordinat darurat disiapkan untuk dibagikan.');
